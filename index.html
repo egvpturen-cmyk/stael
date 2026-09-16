@@ -80,22 +80,14 @@ header{position:relative}
 .zoom-plak{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--zwart)}
 #vonken{position:absolute;inset:0;pointer-events:none;z-index:3;transition:opacity .3s}
 .zoom-wrap{position:absolute;inset:0;will-change:transform;opacity:0;
-  animation:wrapfade 1.1s .15s ease forwards;
   -webkit-mask-image:url(assets/logo.png);mask-image:url(assets/logo.png);
-  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
-  -webkit-mask-position:center 44%;mask-position:center 44%;
-  -webkit-mask-size:min(64vw,540px) auto;mask-size:min(64vw,540px) auto}
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+.zoom-startlogo{position:absolute;z-index:2;opacity:0;pointer-events:none}
 .zoom-foto{position:absolute;inset:0;background:url(assets/huis2.jpg) center/cover;will-change:transform}
 .zoom-vlak{position:absolute;inset:0;background:url(assets/huis2.jpg) center/cover;
   filter:brightness(.55);opacity:0;pointer-events:none}
 .zoom-doek{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
   background:radial-gradient(ellipse 90% 70% at 50% 45%,rgba(19,19,21,.25) 0%,rgba(19,19,21,.82) 78%,var(--zwart) 100%)}
-.zoom-hint{position:absolute;bottom:2.4rem;left:50%;transform:translateX(-50%);z-index:5;
-  color:var(--grijs);font-size:.78rem;letter-spacing:.3em;text-transform:uppercase;
-  transition:opacity .5s;white-space:nowrap}
-.zoom-hint::after{content:'';position:absolute;left:50%;top:calc(100% + .7rem);width:1px;height:34px;
-  background:linear-gradient(to bottom,var(--koper),transparent);
-  animation:hint 2.4s ease-in-out infinite}
 .zoom-einde{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;
   align-items:center;justify-content:center;text-align:center;padding:0 1.4rem;
   opacity:0;pointer-events:none;transition:opacity .6s}
@@ -105,14 +97,12 @@ header{position:relative}
 .hero-zin{margin:1.5rem auto 2.4rem;font-size:clamp(1.05rem,2.1vw,1.35rem);color:var(--grijs);max-width:34em}
 .hero-cta{display:inline-flex;gap:1rem;flex-wrap:wrap;justify-content:center}
 @keyframes opkomen{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
-@keyframes wrapfade{from{opacity:0}to{opacity:1}}
 .knop{display:inline-block;padding:.85rem 2.1rem;font-size:.88rem;letter-spacing:.12em;
   border:1px solid var(--koper);color:var(--koper-fel);transition:background .35s,color .35s,box-shadow .35s;
   background:rgba(201,138,94,.06);will-change:transform}
 .knop:hover{background:var(--koper);color:var(--zwart);box-shadow:0 0 28px rgba(201,138,94,.4)}
 .knop.stil{border-color:var(--rand);color:var(--grijs);background:transparent}
 .knop.stil:hover{border-color:var(--wit);color:var(--wit);box-shadow:none;background:transparent}
-@keyframes hint{0%,100%{opacity:.25;transform:translateX(-50%) scaleY(.6)}50%{opacity:1;transform:translateX(-50%) scaleY(1)}}
 
 /* ---------- lasnaad-divider ---------- */
 .lasnaad{position:relative;height:1px;max-width:var(--maat);margin:0 auto;background:var(--rand);overflow:visible}
@@ -383,7 +373,6 @@ footer p{font-size:.8rem;color:var(--grijs)}
   .zoom-vlak{opacity:1}
   .zoom-doek{opacity:1}
   .zoom-einde{opacity:1;pointer-events:auto}
-  .zoom-hint{display:none}
   .lint-baan{animation:none}
   html{scroll-behavior:auto}
   .over-foto img{clip-path:none}
@@ -417,9 +406,9 @@ footer p{font-size:.8rem;color:var(--grijs)}
       <div class="zoom-wrap" id="zoom-wrap">
         <div class="zoom-foto" id="zoom-foto"></div>
       </div>
+      <img class="zoom-startlogo" id="zoom-startlogo" src="assets/logo.png" alt="">
       <div class="zoom-vlak" id="zoom-vlak"></div>
       <div class="zoom-doek" id="zoom-doek"></div>
-      <p class="zoom-hint" id="zoom-hint">Architectural Steel Homes</p>
       <div class="zoom-einde" id="zoom-einde">
         <img class="hero-logo" src="assets/logo.png" alt="STÆL — Architectural Steel Homes">
         <p class="hero-zin">Woningen met een stalen hoofddraagconstructie. Grote overspanningen, veel glas, industriële elegantie. Ontworpen, geproduceerd en gemonteerd door bouwers.</p>
@@ -745,43 +734,57 @@ if(fijnePointer&&beweegOK){
 // ---------- zoom-hero: automatisch door het logo naar binnen ----------
 const zoomWrap=document.getElementById('zoom-wrap');
 const zoomFoto=document.getElementById('zoom-foto');
-const zoomHint=document.getElementById('zoom-hint');
 const zoomEinde=document.getElementById('zoom-einde');
 const zoomDoek=document.getElementById('zoom-doek');
 const zoomVlak=document.getElementById('zoom-vlak');
+const startLogo=document.getElementById('zoom-startlogo');
+const heroLogo=zoomEinde.querySelector('.hero-logo');
 function zoomOrigin(){
-  const maskW=Math.min(.64*innerWidth,540);
-  // mask-position werkt als background-position: 44% van het maskervak op 44% van de container
-  const links=.5*(innerWidth-maskW), boven=.44*(innerHeight-maskW);
-  const ox=links+.57*maskW, oy=boven+.66*maskW;
+  // meet de eindpositie van het hero-logo (zoom-einde is opacity 0 maar wordt gelayout)
+  const wrapR=zoomWrap.getBoundingClientRect(), logoR=heroLogo.getBoundingClientRect();
+  const left=logoR.left-wrapR.left, top=logoR.top-wrapR.top, w=logoR.width;
+  zoomWrap.style.webkitMaskPosition=left+'px '+top+'px';
+  zoomWrap.style.maskPosition=left+'px '+top+'px';
+  zoomWrap.style.webkitMaskSize=w+'px auto';
+  zoomWrap.style.maskSize=w+'px auto';
+  startLogo.style.left=left+'px';startLogo.style.top=top+'px';startLogo.style.width=w+'px';
+  const ox=left+.57*w, oy=top+.66*w; // midden van de AE in het vierkante logobeeld
   zoomWrap.style.transformOrigin=ox+'px '+oy+'px';
   zoomFoto.style.transformOrigin=ox+'px '+oy+'px';
 }
-zoomOrigin();
 addEventListener('resize',zoomOrigin);
 function zoomIntro(){
-  if(!beweegOK){zoomEinde.classList.add('zichtbaar');zoomHint.style.opacity=0;return;}
-  const wacht=1500, duur=2800, t0=performance.now();
+  if(!beweegOK){zoomEinde.classList.add('zichtbaar');return;}
+  const t0=performance.now();
   // begrens de eindschaal: op mobiel wordt de gemaskeerde laag anders groter dan de GPU-limiet
   const maxS=Math.min(Math.max(14000/(Math.max(innerWidth,innerHeight)*Math.min(devicePixelRatio||1,3)),8),42);
   function frame(t){
-    const ruw=(t-t0-wacht)/duur;
-    const p=Math.min(Math.max(ruw,0),1);
-    const e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2; // easeInOutCubic
-    const s=1+Math.pow(e,1.45)*maxS;
-    zoomWrap.style.transform='scale('+s+')';
-    zoomFoto.style.transform='scale('+(1/s)+')';
-    zoomHint.style.opacity=e<.04?1:0;
-    zoomDoek.style.opacity=e>.62?Math.min((e-.62)/.3,1):0;
-    zoomVlak.style.opacity=e>.7?Math.min((e-.7)/.28,1):0;
-    if(e>.82)zoomEinde.classList.add('zichtbaar');
-    document.getElementById('vonken').style.opacity=1-e*.55; // dimt naar .45, vonken blijven zweven
-    if(p<1)requestAnimationFrame(frame);
-    else zoomWrap.style.visibility='hidden';
+    const ms=t-t0;
+    if(ms<800){ // massief logo fadet in
+      startLogo.style.opacity=ms/800;
+      zoomWrap.style.opacity=0;
+    }else if(ms<1800){ // crossfade: massief logo -> foto door de letters
+      const k=(ms-800)/1000;
+      startLogo.style.opacity=1-k;
+      zoomWrap.style.opacity=k;
+    }else{ // zoom door de AE naar binnen
+      startLogo.style.opacity=0;
+      zoomWrap.style.opacity=1;
+      const p=Math.min((ms-1800)/2800,1);
+      const e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2; // easeInOutCubic
+      const s=1+Math.pow(e,1.45)*maxS;
+      zoomWrap.style.transform='scale('+s+')';
+      zoomFoto.style.transform='scale('+(1/s)+')';
+      zoomDoek.style.opacity=e>.62?Math.min((e-.62)/.3,1):0;
+      zoomVlak.style.opacity=e>.7?Math.min((e-.7)/.28,1):0;
+      if(e>.82)zoomEinde.classList.add('zichtbaar');
+      if(p>=1){zoomWrap.style.visibility='hidden';return;}
+    }
+    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
-addEventListener('load',zoomIntro);
+addEventListener('load',()=>{zoomOrigin();zoomIntro();});
 
 // ---------- scroll: voortgang, nav, parallax, masker, hscroll ----------
 const voortgang=document.getElementById('voortgang');
