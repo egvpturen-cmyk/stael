@@ -1,0 +1,66 @@
+:root{
+  --zwart:#131315; --paneel:#1b1b1e; --paneel2:#232327; --rand:#2e2e33;
+  --koper:#c98a5e; --koper-fel:#e8b48c; --wit:#efece6; --grijs:#95928c;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#wortel{height:100%}
+body{background:var(--zwart);color:var(--wit);
+  font-family:'Archivo',system-ui,sans-serif;font-weight:340;
+  font-variation-settings:'wdth' 100;}
+.app{min-height:100%;display:flex;flex-direction:column}
+
+header{display:flex;align-items:center;gap:1.2rem;padding:.9rem 1.4rem;
+  border-bottom:1px solid var(--rand);background:rgba(19,19,21,.9)}
+header .merk img{height:22px;display:block}
+header .titel{font-size:.85rem;letter-spacing:.22em;color:var(--wit)}
+header .titel em{font-style:normal;color:var(--koper);letter-spacing:.08em;text-transform:lowercase}
+
+.indeling{display:grid;grid-template-columns:290px 1fr;gap:0;flex:1;min-height:0}
+aside{padding:1.4rem;border-right:1px solid var(--rand);background:var(--paneel)}
+aside h2{font-size:.8rem;letter-spacing:.26em;text-transform:uppercase;color:var(--grijs);margin-bottom:1.1rem}
+
+.veld{display:block;margin-bottom:1rem}
+.veld>span{display:block;font-size:.78rem;letter-spacing:.08em;color:var(--grijs);margin-bottom:.35rem}
+.veld>span em{font-style:normal;color:#6c6963}
+.veld input{width:100%;background:var(--paneel2);border:1px solid var(--rand);color:var(--wit);
+  padding:.55rem .7rem;font-family:inherit;font-size:.95rem}
+.veld input:focus{outline:1px solid var(--koper)}
+.knopgroep{display:flex;gap:.4rem;flex-wrap:wrap}
+.knopgroep button{flex:1;background:var(--paneel2);border:1px solid var(--rand);color:var(--grijs);
+  padding:.5rem .4rem;font-family:inherit;font-size:.78rem;letter-spacing:.04em;cursor:pointer;white-space:nowrap}
+.knopgroep button.actief{border-color:var(--koper);color:var(--koper-fel);background:rgba(201,138,94,.08)}
+
+.regelknop{width:100%;background:none;border:1px solid var(--rand);color:var(--grijs);
+  padding:.55rem;font-family:inherit;font-size:.78rem;letter-spacing:.1em;cursor:pointer;margin:.4rem 0 .9rem}
+.regels{padding:.2rem 0 .4rem}
+.voetnoot{font-size:.74rem;color:#6c6963;line-height:1.5;margin-top:1.2rem}
+
+main{padding:1.4rem;overflow-y:auto}
+.varianten{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.2rem}
+.variant{background:var(--paneel);border:1px solid var(--rand);display:flex;flex-direction:column}
+.canvasvak{aspect-ratio:4/3;min-height:230px;position:relative}
+.canvasvak canvas{position:absolute;inset:0}
+.variantinfo{padding:1rem 1.1rem 1.2rem}
+.variantinfo h3{font-size:1rem;font-weight:640;letter-spacing:.04em;margin-bottom:.35rem}
+.variantinfo p{font-size:.8rem;color:var(--grijs);line-height:1.5;margin-bottom:.7rem}
+.variantinfo dl{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin-bottom:.8rem}
+.variantinfo dt{font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:#6c6963}
+.variantinfo dd{font-size:.85rem;color:var(--wit)}
+.variantinfo>button{background:rgba(201,138,94,.06);border:1px solid var(--koper);color:var(--koper-fel);
+  padding:.5rem 1.2rem;font-family:inherit;font-size:.78rem;letter-spacing:.1em;cursor:pointer}
+.variantinfo>button:hover{background:var(--koper);color:var(--zwart)}
+.waarschuwing{color:#d9a05a;font-size:.78rem;border-left:2px solid var(--koper);padding-left:.6rem;margin-bottom:.7rem}
+
+.grootvak{position:fixed;inset:0;z-index:50;background:rgba(15,15,17,.96);display:flex;flex-direction:column;padding:1rem}
+.grootcanvas{flex:1;min-height:0;position:relative}
+.grootcanvas canvas{position:absolute;inset:0}
+.sluit{align-self:flex-end;background:none;border:1px solid var(--rand);color:var(--wit);
+  padding:.5rem 1rem;font-family:inherit;font-size:.8rem;cursor:pointer;margin-bottom:.6rem}
+.groottitel{text-align:center;color:var(--grijs);font-size:.82rem;padding:.7rem 0 .2rem}
+
+@media(max-width:860px){
+  .indeling{grid-template-columns:1fr}
+  aside{border-right:none;border-bottom:1px solid var(--rand)}
+  .varianten{grid-template-columns:1fr}
+  .canvasvak{min-height:260px}
+}
