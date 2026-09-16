@@ -168,7 +168,6 @@ section{padding:clamp(4.5rem,9vw,7.5rem) clamp(1.2rem,4vw,3rem)}
 .t4{grid-column:span 2}
 .t5{grid-column:span 2;grid-row:span 2}
 .t6{grid-column:span 4}
-.galerij-voet{margin-top:1.4rem;font-size:.82rem;color:var(--grijs)}
 
 /* ---------- lightbox ---------- */
 #lightbox{position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.94);
@@ -230,7 +229,8 @@ section{padding:clamp(4.5rem,9vw,7.5rem) clamp(1.2rem,4vw,3rem)}
 /* ---------- horizontale bouwsectie ---------- */
 #bouw{padding:0}
 .hscroll{height:340vh;position:relative}
-.hscroll-plak{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.hscroll-plak{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;flex-direction:column;justify-content:center;
+  padding-top:clamp(4.5rem,9vw,7.5rem)}
 .hscroll-kop{padding:0 clamp(1.2rem,4vw,3rem);max-width:var(--maat);margin:0 auto 2.4rem;width:100%}
 .hscroll-baan{display:flex;gap:clamp(1rem,2.5vw,2rem);padding:0 clamp(1.2rem,4vw,3rem);will-change:transform}
 .hpaneel{flex:0 0 auto;width:min(68vw,760px);position:relative;overflow:hidden}
@@ -240,8 +240,6 @@ section{padding:clamp(4.5rem,9vw,7.5rem) clamp(1.2rem,4vw,3rem)}
   font-size:.9rem;letter-spacing:.08em}
 .hpaneel figcaption em{font-style:normal;color:var(--koper-fel);display:block;font-size:.75rem;
   letter-spacing:.24em;text-transform:uppercase;margin-bottom:.2rem}
-.hscroll-tip{padding:1.8rem clamp(1.2rem,4vw,3rem) 0;max-width:var(--maat);margin:0 auto;width:100%;
-  font-size:.8rem;color:var(--grijs);letter-spacing:.06em}
 
 /* ---------- statement ---------- */
 #statement{position:relative;padding:clamp(6rem,12vw,10rem) clamp(1.2rem,4vw,3rem);overflow:hidden}
@@ -472,7 +470,6 @@ footer p{font-size:.8rem;color:var(--grijs)}
       <figure class="tegel t5 onthul" data-index="4"><img src="assets/huis5.jpg" alt="Langgerekte woning met koperkleurig dak en houten gevel" loading="lazy"><figcaption>LANGHUIS — koperen daklijn boven hout</figcaption></figure>
       <figure class="tegel t6 onthul" data-index="5"><img src="assets/huis6.jpg" alt="Woning aan de plas met aanlegsteiger en sloep" loading="lazy"><figcaption>ANKER — thuis aan de plas</figcaption></figure>
     </div>
-    <p class="galerij-voet onthul">Conceptbeelden ter inspiratie. Ons eerste gerealiseerde project volgt hier binnenkort.</p>
   </div>
 </section>
 
@@ -559,7 +556,6 @@ footer p{font-size:.8rem;color:var(--grijs)}
         <figure class="hpaneel"><img src="assets/actie3.jpg" alt="Monteurs schroeven gevelbeplating vast aan de waterkant" loading="lazy"><figcaption><em>Schil</em>Geïsoleerde beplating maakt het frame wind- en waterdicht</figcaption></figure>
         <figure class="hpaneel"><img src="assets/actie4.jpg" alt="Afmontage van hanglampen in de loftwoning met polderzicht" loading="lazy"><figcaption><em>Afbouw</em>Tot en met het laatste armatuur: één team, één standaard</figcaption></figure>
       </div>
-      <p class="hscroll-tip">Sfeerbeelden ter illustratie van de werkwijze</p>
     </div>
   </div>
 </section>
