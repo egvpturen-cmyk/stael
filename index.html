@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STÆL — Architectural Steel Homes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<style>
+:root{
+  --zwart:#131315;
+  --paneel:#1b1b1e;
+  --paneel-licht:#232327;
+  --rand:#2e2e33;
+  --koper:#c98a5e;
+  --koper-fel:#e8b48c;
+  --koper-diep:#8a5637;
+  --wit:#efece6;
+  --grijs:#95928c;
+  --maat:1120px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--zwart);
+  color:var(--wit);
+  font-family:'Archivo',system-ui,sans-serif;
+  font-weight:340;
+  line-height:1.65;
+  overflow-x:hidden;
+}
+::selection{background:var(--koper);color:var(--zwart)}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-weight:640;line-height:1.08;letter-spacing:-.015em}
+
+/* ---------- cursor (alleen desktop) ---------- */
+@media(pointer:fine){
+  #cursor-stip{position:fixed;top:0;left:0;width:7px;height:7px;border-radius:50%;
+    background:var(--koper-fel);z-index:400;pointer-events:none;
+    transform:translate(-50%,-50%);box-shadow:0 0 10px rgba(232,180,140,.8)}
+  #cursor-ring{position:fixed;top:0;left:0;width:34px;height:34px;border-radius:50%;
+    border:1px solid rgba(201,138,94,.5);z-index:399;pointer-events:none;
+    transform:translate(-50%,-50%);transition:width .3s,height .3s,border-color .3s,background .3s}
+  #cursor-ring.groot{width:64px;height:64px;border-color:var(--koper-fel);background:rgba(201,138,94,.08)}
+  a,button,.tegel{cursor:none}
+  body{cursor:none}
+}
+@media(pointer:coarse){#cursor-stip,#cursor-ring{display:none}}
+
+/* ---------- scroll voortgang ---------- */
+#voortgang{position:fixed;top:0;left:0;height:2px;width:0;z-index:200;
+  background:linear-gradient(90deg,var(--koper-diep),var(--koper-fel));
+  box-shadow:0 0 12px rgba(232,180,140,.55)}
+
+/* ---------- navigatie ---------- */
+nav{position:fixed;top:0;left:0;right:0;z-index:150;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.1rem clamp(1.2rem,4vw,3rem);
+  transition:background .4s,border-color .4s,padding .4s;
+  border-bottom:1px solid transparent}
+nav.vast{background:rgba(19,19,21,.88);backdrop-filter:blur(14px);
+  border-bottom-color:var(--rand);padding:.7rem clamp(1.2rem,4vw,3rem)}
+.nav-merk{display:flex;align-items:center}
+.nav-merk img{height:19px;width:auto;display:block}
+.nav-merk .ae{color:var(--koper)}
+.nav-links{display:flex;gap:2.2rem;font-size:.86rem;letter-spacing:.05em;color:var(--grijs)}
+.nav-links a{position:relative;transition:color .3s}
+.nav-links a::after{content:'';position:absolute;left:0;bottom:-5px;height:1px;width:0;
+  background:var(--koper);transition:width .35s}
+.nav-links a:hover{color:var(--wit)}
+.nav-links a:hover::after{width:100%}
+#menuknop{display:none;background:none;border:1px solid var(--rand);color:var(--wit);
+  padding:.45rem .8rem;font-family:inherit;font-size:.8rem;letter-spacing:.08em;cursor:pointer}
+
+/* ---------- zoom-hero: door het logo de woning in ---------- */
+header{position:relative}
+.zoomhero{height:100svh;position:relative}
+.zoom-plak{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--zwart)}
+#vonken{position:absolute;inset:0;pointer-events:none;z-index:3;transition:opacity .3s}
+.zoom-wrap{position:absolute;inset:0;will-change:transform;opacity:0;
+  animation:wrapfade 1.1s .15s ease forwards;
+  -webkit-mask-image:url(assets/logo.png);mask-image:url(assets/logo.png);
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center 44%;mask-position:center 44%;
+  -webkit-mask-size:min(64vw,540px) auto;mask-size:min(64vw,540px) auto}
+.zoom-foto{position:absolute;inset:0;background:url(assets/huis2.jpg) center/cover;will-change:transform}
+.zoom-doek{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse 90% 70% at 50% 45%,rgba(19,19,21,.25) 0%,rgba(19,19,21,.82) 78%,var(--zwart) 100%)}
+.zoom-hint{position:absolute;bottom:2.4rem;left:50%;transform:translateX(-50%);z-index:5;
+  color:var(--grijs);font-size:.78rem;letter-spacing:.3em;text-transform:uppercase;
+  transition:opacity .5s;white-space:nowrap}
+.zoom-hint::after{content:'';position:absolute;left:50%;top:calc(100% + .7rem);width:1px;height:34px;
+  background:linear-gradient(to bottom,var(--koper),transparent);
+  animation:hint 2.4s ease-in-out infinite}
+.zoom-einde{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:0 1.4rem;
+  opacity:0;pointer-events:none;transition:opacity .6s}
+.zoom-einde.zichtbaar{opacity:1;pointer-events:auto}
+.hero-logo{width:min(360px,66vw);margin:0 auto 1.4rem;
+  filter:drop-shadow(0 0 34px rgba(201,138,94,.3))}
+.hero-zin{margin:1.5rem auto 2.4rem;font-size:clamp(1.05rem,2.1vw,1.35rem);color:var(--grijs);max-width:34em}
+.hero-cta{display:inline-flex;gap:1rem;flex-wrap:wrap;justify-content:center}
+@keyframes opkomen{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes wrapfade{from{opacity:0}to{opacity:1}}
+.knop{display:inline-block;padding:.85rem 2.1rem;font-size:.88rem;letter-spacing:.12em;
+  border:1px solid var(--koper);color:var(--koper-fel);transition:background .35s,color .35s,box-shadow .35s;
+  background:rgba(201,138,94,.06);will-change:transform}
+.knop:hover{background:var(--koper);color:var(--zwart);box-shadow:0 0 28px rgba(201,138,94,.4)}
+.knop.stil{border-color:var(--rand);color:var(--grijs);background:transparent}
+.knop.stil:hover{border-color:var(--wit);color:var(--wit);box-shadow:none;background:transparent}
+@keyframes hint{0%,100%{opacity:.25;transform:translateX(-50%) scaleY(.6)}50%{opacity:1;transform:translateX(-50%) scaleY(1)}}
+
+/* ---------- lasnaad-divider ---------- */
+.lasnaad{position:relative;height:1px;max-width:var(--maat);margin:0 auto;background:var(--rand);overflow:visible}
+.lasnaad::before{content:'';position:absolute;top:-1px;left:0;height:3px;width:0;
+  background:linear-gradient(90deg,transparent,var(--koper-fel),var(--koper));
+  box-shadow:0 0 16px 2px rgba(232,180,140,.5);
+  transition:width 1.6s cubic-bezier(.6,.05,.2,1)}
+.lasnaad.gloeit::before{width:100%}
+
+/* ---------- secties algemeen ---------- */
+section{padding:clamp(4.5rem,9vw,7.5rem) clamp(1.2rem,4vw,3rem)}
+.kern{max-width:var(--maat);margin:0 auto}
+.sectiekop{font-size:clamp(1.9rem,4.2vw,3rem);margin-bottom:1rem}
+.sectiekop .accent{color:var(--koper)}
+.intro-tekst{color:var(--grijs);max-width:36em;font-size:1.02rem}
+.onthul{opacity:0;transform:translateY(26px);transition:opacity .9s ease,transform .9s ease}
+.onthul.zichtbaar{opacity:1;transform:none}
+
+/* ---------- over ---------- */
+.over-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(2rem,5vw,4.5rem);align-items:center}
+.over-foto{position:relative;aspect-ratio:4/3.4;overflow:hidden;cursor:pointer}
+.over-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tf-render{filter:saturate(.9)}
+.tf-echt{clip-path:inset(0 100% 0 0)}
+.tf-vonken{position:absolute;inset:0;pointer-events:none;z-index:3}
+.over-foto::after{content:'';position:absolute;inset:0;border:1px solid rgba(232,180,140,.25);
+  transform:translate(14px,14px);pointer-events:none;transition:transform .5s}
+.over-foto:hover::after{transform:translate(8px,8px)}
+.feiten{display:flex;gap:clamp(1.5rem,4vw,3.5rem);margin-top:2.6rem;flex-wrap:wrap}
+.feit strong{display:block;font-size:clamp(1.9rem,3.4vw,2.6rem);font-weight:680;
+  background:linear-gradient(115deg,var(--wit) 30%,var(--koper-fel) 85%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.feit span{font-size:.82rem;color:var(--grijs);letter-spacing:.05em}
+
+/* ---------- gemaskeerde giga-tekst ---------- */
+#masker{padding:clamp(2rem,5vw,4rem) 0;overflow:hidden}
+.masker-tekst{font-size:clamp(5.5rem,21vw,19rem);font-weight:800;text-align:center;line-height:.95;
+  letter-spacing:-.02em;user-select:none;
+  background-image:url(assets/huis1.jpg);background-size:cover;background-position:center 30%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:brightness(1.12) contrast(1.05);will-change:background-position}
+.masker-sub{text-align:center;color:var(--grijs);font-size:.85rem;letter-spacing:.34em;
+  text-transform:uppercase;margin-top:1.2rem}
+.masker-sub .ae{color:var(--koper)}
+
+/* ---------- projectengalerij ---------- */
+#projecten{background:var(--paneel);border-top:1px solid var(--rand);border-bottom:1px solid var(--rand)}
+.mozaiek{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:180px;gap:14px;margin-top:3rem;perspective:1200px}
+.tegel{position:relative;overflow:hidden;cursor:pointer;background:var(--paneel-licht);
+  transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.6,.2,1)}
+.tegel img{width:100%;height:100%;object-fit:cover;transition:transform .8s cubic-bezier(.2,.6,.2,1),filter .5s;filter:saturate(.9)}
+.tegel:hover img{transform:scale(1.045);filter:saturate(1.05)}
+.tegel::before{content:'';position:absolute;inset:0;border:1px solid transparent;z-index:2;pointer-events:none;transition:border-color .4s,box-shadow .4s}
+.tegel:hover::before{border-color:rgba(232,180,140,.55);box-shadow:inset 0 0 34px rgba(201,138,94,.18)}
+.tegel figcaption{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:1.6rem 1.2rem .9rem;
+  font-size:.85rem;letter-spacing:.1em;color:var(--wit);
+  background:linear-gradient(to top,rgba(19,19,21,.85),transparent);
+  transform:translateY(8px);opacity:0;transition:all .45s}
+.tegel:hover figcaption{transform:none;opacity:1}
+.t1{grid-column:span 4;grid-row:span 2}
+.t2{grid-column:span 2;grid-row:span 2}
+.t3{grid-column:span 2}
+.t4{grid-column:span 2}
+.t5{grid-column:span 2;grid-row:span 2}
+.t6{grid-column:span 4}
+.galerij-voet{margin-top:1.4rem;font-size:.82rem;color:var(--grijs)}
+
+/* ---------- lightbox ---------- */
+#lightbox{position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.94);
+  display:none;align-items:center;justify-content:center;padding:2.5rem}
+#lightbox.open{display:flex;animation:lbfade .3s ease}
+@keyframes lbfade{from{opacity:0}to{opacity:1}}
+#lightbox img{max-width:min(1100px,92vw);max-height:84vh;object-fit:contain;
+  box-shadow:0 0 80px rgba(201,138,94,.15)}
+#lb-sluit{position:absolute;top:1.4rem;right:1.8rem;background:none;border:none;color:var(--grijs);
+  font-size:2rem;cursor:pointer;line-height:1;transition:color .3s}
+#lb-sluit:hover{color:var(--koper-fel)}
+#lb-vorige,#lb-volgende{position:absolute;top:50%;transform:translateY(-50%);
+  background:rgba(27,27,30,.7);border:1px solid var(--rand);color:var(--wit);
+  width:46px;height:46px;cursor:pointer;font-size:1.1rem;transition:all .3s}
+#lb-vorige:hover,#lb-volgende:hover{border-color:var(--koper);color:var(--koper-fel)}
+#lb-vorige{left:1.4rem}#lb-volgende{right:1.4rem}
+
+/* ---------- woordenlint ---------- */
+.lint{overflow:hidden;padding:2rem 0;border-top:1px solid var(--rand);border-bottom:1px solid var(--rand);
+  background:var(--zwart)}
+.lint-baan{display:flex;gap:3.2rem;white-space:nowrap;width:max-content;
+  animation:lintloop 30s linear infinite;font-size:clamp(1.1rem,2.4vw,1.7rem);font-weight:560;letter-spacing:.16em}
+.lint:hover .lint-baan{animation-play-state:paused}
+.lint-baan span{display:flex;align-items:center;gap:3.2rem;color:var(--wit)}
+.lint-baan i{font-style:normal;color:var(--koper);font-size:.7em;transform:rotate(45deg);display:inline-block}
+@keyframes lintloop{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ---------- waarom staal (tabs) ---------- */
+.tab-balk{display:flex;gap:0;margin:2.8rem 0 0;border-bottom:1px solid var(--rand);position:relative;flex-wrap:wrap}
+.tab{background:none;border:none;color:var(--grijs);font-family:inherit;font-size:.92rem;
+  letter-spacing:.06em;padding:1rem 1.6rem;cursor:pointer;transition:color .3s;position:relative}
+.tab:hover{color:var(--wit)}
+.tab.actief{color:var(--koper-fel)}
+#tab-lijn{position:absolute;bottom:-1px;height:2px;background:var(--koper);
+  box-shadow:0 0 10px rgba(201,138,94,.6);transition:left .4s cubic-bezier(.6,.05,.2,1),width .4s cubic-bezier(.6,.05,.2,1)}
+.tab-inhoud{display:none;padding-top:2.4rem;animation:tabin .5s ease}
+.tab-inhoud.actief{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,4vw,4rem);align-items:start}
+@keyframes tabin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.tab-inhoud h3{font-size:1.5rem;margin-bottom:.9rem}
+.tab-inhoud p{color:var(--grijs)}
+.tab-stat{border-left:2px solid var(--koper);padding:.4rem 0 .4rem 1.4rem}
+.tab-stat strong{display:block;font-size:2.1rem;font-weight:680;color:var(--koper-fel)}
+.tab-stat span{font-size:.86rem;color:var(--grijs)}
+
+/* ---------- werkwijze ---------- */
+#werkwijze{background:var(--paneel);border-top:1px solid var(--rand);border-bottom:1px solid var(--rand)}
+.tijdlijn{margin-top:3.2rem;position:relative;padding-left:2.2rem}
+.tijdlijn::before{content:'';position:absolute;left:6px;top:8px;bottom:8px;width:1px;
+  background:linear-gradient(to bottom,var(--koper),var(--rand) 85%)}
+.stap{position:relative;padding:0 0 2.6rem 1.6rem}
+.stap:last-child{padding-bottom:0}
+.stap::before{content:'';position:absolute;left:-2.2rem;top:7px;width:13px;height:13px;
+  background:var(--zwart);border:2px solid var(--koper);transform:rotate(45deg);transition:all .4s}
+.stap.zichtbaar::before{background:var(--koper);box-shadow:0 0 14px rgba(201,138,94,.6)}
+.stap h3{font-size:1.15rem;margin-bottom:.35rem}
+.stap h3 em{font-style:normal;color:var(--koper);font-weight:640;margin-right:.7rem;font-size:.9rem}
+.stap p{color:var(--grijs);font-size:.95rem;max-width:44em}
+
+/* ---------- horizontale bouwsectie ---------- */
+#bouw{padding:0}
+.hscroll{height:340vh;position:relative}
+.hscroll-plak{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.hscroll-kop{padding:0 clamp(1.2rem,4vw,3rem);max-width:var(--maat);margin:0 auto 2.4rem;width:100%}
+.hscroll-baan{display:flex;gap:clamp(1rem,2.5vw,2rem);padding:0 clamp(1.2rem,4vw,3rem);will-change:transform}
+.hpaneel{flex:0 0 auto;width:min(68vw,760px);position:relative;overflow:hidden}
+.hpaneel img{width:100%;aspect-ratio:4/3;object-fit:cover;filter:saturate(.92)}
+.hpaneel figcaption{position:absolute;left:0;right:0;bottom:0;padding:2rem 1.4rem 1.1rem;
+  background:linear-gradient(to top,rgba(19,19,21,.88),transparent);
+  font-size:.9rem;letter-spacing:.08em}
+.hpaneel figcaption em{font-style:normal;color:var(--koper-fel);display:block;font-size:.75rem;
+  letter-spacing:.24em;text-transform:uppercase;margin-bottom:.2rem}
+.hscroll-tip{padding:1.8rem clamp(1.2rem,4vw,3rem) 0;max-width:var(--maat);margin:0 auto;width:100%;
+  font-size:.8rem;color:var(--grijs);letter-spacing:.06em}
+
+/* ---------- statement ---------- */
+#statement{position:relative;padding:clamp(6rem,12vw,10rem) clamp(1.2rem,4vw,3rem);overflow:hidden}
+.statement-foto{position:absolute;inset:0;background:url(assets/huis6.jpg) center/cover;
+  filter:brightness(.32) saturate(.85);transform:scale(1.12);will-change:transform}
+.statement-tekst{position:relative;max-width:var(--maat);margin:0 auto;text-align:center}
+.statement-tekst blockquote{font-size:clamp(1.5rem,3.6vw,2.5rem);font-weight:520;line-height:1.35;max-width:22em;margin:0 auto}
+.statement-tekst blockquote .accent{color:var(--koper-fel)}
+.statement-tekst cite{display:block;margin-top:1.6rem;font-style:normal;font-size:.85rem;
+  letter-spacing:.28em;color:var(--grijs);text-transform:uppercase}
+
+/* ---------- faq ---------- */
+.faq-item{border-bottom:1px solid var(--rand)}
+.faq-item:first-of-type{border-top:1px solid var(--rand);margin-top:2.6rem}
+.faq-vraag{width:100%;background:none;border:none;color:var(--wit);font-family:inherit;
+  font-size:1.05rem;font-weight:520;text-align:left;padding:1.4rem .2rem;cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;gap:1.5rem;transition:color .3s}
+.faq-vraag:hover{color:var(--koper-fel)}
+.faq-vraag .plus{font-size:1.4rem;font-weight:300;color:var(--koper);transition:transform .35s;flex-shrink:0}
+.faq-item.open .plus{transform:rotate(45deg)}
+.faq-antwoord{max-height:0;overflow:hidden;transition:max-height .5s cubic-bezier(.4,0,.2,1)}
+.faq-antwoord p{color:var(--grijs);padding:0 .2rem 1.5rem;max-width:52em;font-size:.96rem}
+
+/* ---------- contact ---------- */
+#contact{background:linear-gradient(180deg,var(--zwart) 0%,#17130f 100%);border-top:1px solid var(--rand)}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2.5rem,5vw,5rem);align-items:start}
+.contact-info p{color:var(--grijs);margin-bottom:1.8rem;max-width:30em}
+.contact-regel{display:flex;gap:.9rem;align-items:baseline;padding:.55rem 0;font-size:.96rem}
+.contact-regel span:first-child{color:var(--koper);font-size:.8rem;letter-spacing:.1em;min-width:5.5rem}
+form{display:grid;gap:1rem}
+.veld{display:grid;gap:.4rem}
+.veld label{font-size:.8rem;letter-spacing:.08em;color:var(--grijs)}
+.veld input,.veld textarea{background:var(--paneel);border:1px solid var(--rand);color:var(--wit);
+  font-family:inherit;font-size:.95rem;padding:.85rem 1rem;transition:border-color .3s,box-shadow .3s}
+.veld input:focus,.veld textarea:focus{outline:none;border-color:var(--koper);box-shadow:0 0 0 3px rgba(201,138,94,.14)}
+form .knop{justify-self:start;cursor:pointer;font-family:inherit}
+#vorm-dank{display:none;padding:1rem 1.2rem;border:1px solid var(--koper);color:var(--koper-fel);font-size:.92rem}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--rand);padding:2.6rem clamp(1.2rem,4vw,3rem);
+  display:flex;justify-content:space-between;align-items:center;gap:1.5rem;flex-wrap:wrap}
+footer .merk img{height:17px;width:auto;display:block}
+footer .merk .ae{color:var(--koper)}
+footer p{font-size:.8rem;color:var(--grijs)}
+
+/* ---------- live architect ---------- */
+.la-video{margin-top:2.4rem;aspect-ratio:16/7;border:1px dashed var(--rand);display:flex;
+  align-items:center;justify-content:center;gap:1rem;color:var(--grijs);font-size:.9rem;
+  letter-spacing:.12em;background:var(--paneel)}
+.la-video span{width:52px;height:52px;border:1px solid var(--koper);color:var(--koper-fel);
+  display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:.9rem}
+#la-overlay{position:fixed;inset:0;z-index:350;background:var(--zwart);display:none;flex-direction:column}
+#la-overlay.open{display:flex}
+.la-kop{display:flex;justify-content:space-between;align-items:center;
+  padding:.9rem clamp(1rem,3vw,2rem);border-bottom:1px solid var(--rand)}
+.la-titel{letter-spacing:.2em;font-weight:640;font-size:.95rem}
+.la-titel em{font-style:normal;color:var(--koper);font-weight:340;letter-spacing:.1em;margin-left:.6rem;font-size:.8rem}
+#la-sluit{background:none;border:1px solid var(--rand);color:var(--grijs);width:38px;height:38px;
+  font-size:1.3rem;cursor:pointer;transition:all .3s}
+#la-sluit:hover{border-color:var(--koper);color:var(--koper-fel)}
+.la-body{flex:1;display:flex;min-height:0}
+.la-paneel{width:340px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--rand);
+  background:var(--paneel);padding:.6rem}
+.la-stapkop{width:100%;background:none;border:none;border-bottom:1px solid var(--rand);
+  color:var(--grijs);font-family:inherit;font-size:.85rem;letter-spacing:.1em;text-align:left;
+  padding:1rem .6rem;cursor:pointer;transition:color .3s}
+.la-stapkop.actief{color:var(--koper-fel)}
+.la-stapinhoud{display:none;padding:1rem .6rem 1.4rem}
+.la-stapinhoud.open{display:block}
+.la-stapinhoud label{display:block;font-size:.8rem;color:var(--grijs);letter-spacing:.05em;margin-bottom:.9rem}
+.la-stapinhoud input[type=number],.la-stapinhoud input[type=text]{width:100%;margin-top:.35rem;
+  background:var(--zwart);border:1px solid var(--rand);color:var(--wit);font-family:inherit;
+  font-size:.95rem;padding:.6rem .7rem}
+.la-stapinhoud input:focus{outline:none;border-color:var(--koper)}
+.la-veldkop{display:block;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--grijs);margin:.4rem 0 .5rem}
+.la-keuzes{display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:1rem}
+.la-keuzes.la-kolom{flex-direction:column}
+.la-keuze{background:var(--zwart);border:1px solid var(--rand);color:var(--grijs);
+  font-family:inherit;font-size:.82rem;padding:.55rem .8rem;cursor:pointer;transition:all .25s;text-align:left}
+.la-keuze:hover{color:var(--wit);border-color:var(--grijs)}
+.la-keuze.actief{border-color:var(--koper);color:var(--koper-fel);background:rgba(201,138,94,.08)}
+.la-verder{width:100%;margin-top:.4rem;cursor:pointer;font-family:inherit;text-align:center}
+.la-vulaan{width:100%;margin-bottom:.6rem;cursor:pointer;font-family:inherit;text-align:center}
+.la-waarschuwing{color:#d9a05a;font-size:.8rem;min-height:1.2em;margin:-.4rem 0 .5rem}
+.la-uitleg{font-size:.85rem;color:var(--grijs);margin-bottom:1rem}
+#la-opmerkform{display:none;gap:.5rem;flex-direction:column;margin-bottom:1rem}
+#la-opmerkform.open{display:flex}
+#la-opmerkform .knop{cursor:pointer;font-family:inherit}
+#la-opmerkingen{list-style:none;display:grid;gap:.5rem}
+#la-opmerkingen li{border:1px solid var(--rand);padding:.55rem .7rem;font-size:.84rem;color:var(--wit);
+  display:flex;gap:.6rem;align-items:baseline}
+#la-opmerkingen li em{font-style:normal;color:var(--koper-fel);font-weight:640;flex-shrink:0}
+#la-opmerkingen li button{margin-left:auto;background:none;border:none;color:var(--grijs);cursor:pointer;font-size:1rem}
+#la-opmerkingen li button:hover{color:var(--koper-fel)}
+.la-scene{flex:1;position:relative;min-width:0}
+#la-canvas{width:100%;height:100%;display:block;touch-action:none}
+.la-hint{position:absolute;bottom:1rem;left:50%;transform:translateX(-50%);
+  font-size:.72rem;letter-spacing:.1em;color:var(--grijs);background:rgba(19,19,21,.75);
+  padding:.4rem .9rem;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:860px){
+  .la-body{flex-direction:column-reverse}
+  .la-paneel{width:100%;height:46%;border-right:none;border-top:1px solid var(--rand)}
+  .la-scene{height:54%}
+}
+
+/* ---------- responsief ---------- */
+@media(max-width:860px){
+  .nav-links{display:none;position:absolute;top:100%;left:0;right:0;
+    flex-direction:column;gap:0;background:rgba(19,19,21,.97);border-bottom:1px solid var(--rand)}
+  .nav-links.open{display:flex}
+  .nav-links a{padding:1rem clamp(1.2rem,4vw,3rem);border-top:1px solid var(--rand)}
+  #menuknop{display:block}
+  .over-grid,.tab-inhoud.actief,.contact-grid{grid-template-columns:1fr}
+  .mozaiek{grid-template-columns:repeat(2,1fr);grid-auto-rows:150px}
+  .t1{grid-column:span 2;grid-row:span 2}
+  .t2{grid-column:span 1;grid-row:span 1}
+  .t3,.t4{grid-column:span 1}
+  .t5{grid-column:span 2;grid-row:span 1}
+  .t6{grid-column:span 2}
+  .hpaneel{width:82vw}
+  .hscroll{height:380vh}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.15s!important}
+  .zoomhero{height:100svh}
+  .zoom-wrap{-webkit-mask-image:none;mask-image:none}
+  .zoom-foto{filter:brightness(.5)}
+  .zoom-doek{opacity:1}
+  .zoom-einde{opacity:1;pointer-events:auto}
+  .zoom-hint{display:none}
+  .lint-baan{animation:none}
+  html{scroll-behavior:auto}
+  .over-foto img{clip-path:none}
+}
+</style>
+</head>
+<body>
+
+<div id="cursor-ring"></div>
+<div id="cursor-stip"></div>
+<div id="voortgang"></div>
+
+<nav id="navigatie">
+  <a class="nav-merk" href="#top"><img src="assets/wordmark.png" alt="STÆL"></a>
+  <button id="menuknop" aria-label="Menu">MENU</button>
+  <div class="nav-links" id="navlinks">
+    <a href="#over">Over</a>
+    <a href="#projecten">Wonen in staal</a>
+    <a href="#livearchitect">Live Architect</a>
+    <a href="#waarom">Waarom staal</a>
+    <a href="#werkwijze">Werkwijze</a>
+    <a href="#bouw">Op de bouw</a>
+    <a href="#contact">Contact</a>
+  </div>
+</nav>
+
+<header id="top">
+  <div class="zoomhero" id="zoomhero">
+    <div class="zoom-plak">
+      <canvas id="vonken"></canvas>
+      <div class="zoom-wrap" id="zoom-wrap">
+        <div class="zoom-foto" id="zoom-foto"></div>
+      </div>
+      <div class="zoom-doek" id="zoom-doek"></div>
+      <p class="zoom-hint" id="zoom-hint">Architectural Steel Homes</p>
+      <div class="zoom-einde" id="zoom-einde">
+        <img class="hero-logo" src="assets/logo.png" alt="STÆL — Architectural Steel Homes">
+        <p class="hero-zin">Woningen met een stalen hoofddraagconstructie. Grote overspanningen, veel glas, industriële elegantie. Ontworpen, geproduceerd en gemonteerd door bouwers.</p>
+        <div class="hero-cta">
+          <a class="knop" href="#projecten">Bekijk de mogelijkheden</a>
+          <a class="knop stil" href="#contact">Plan een gesprek</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="lasnaad"></div>
+
+<section id="over">
+  <div class="kern over-grid">
+    <div class="onthul">
+      <h2 class="sectiekop">Gebouwd door <span class="accent">bouwers</span>, niet door een tekentafel</h2>
+      <p class="intro-tekst">STÆL is het woningmerk van EG Assembly B.V., een Westlands bouwbedrijf dat sinds 1992 staalconstructies en utiliteitsbouw realiseert. Die ervaring uit de industriebouw brengen we nu naar de woningmarkt: stalen frames die overspanningen mogelijk maken waar traditionele bouw stopt.</p>
+      <p class="intro-tekst" style="margin-top:1rem">Geen doorverkochte aannemerij. Eén team van ontwerp tot montage, met eigen mensen op de bouwplaats.</p>
+      <div class="feiten">
+        <div class="feit"><strong data-teller="1992" data-vanaf="1960">1992</strong><span>bouwers sinds</span></div>
+        <div class="feit"><strong data-teller="30" data-suffix="+">30+</strong><span>jaar constructie-ervaring</span></div>
+        <div class="feit"><strong data-teller="100" data-suffix="%">100%</strong><span>stalen hoofddraagconstructie</span></div>
+      </div>
+    </div>
+    <div class="over-foto onthul" id="transformeer" title="Klik om opnieuw af te spelen">
+      <img class="tf-render" src="assets/render.jpg" alt="3D-model van de schuurwoning uit het BIM-programma">
+      <img class="tf-echt" src="assets/huis5.jpg" alt="Dezelfde woning gerealiseerd, in het avondlicht" loading="lazy">
+      <canvas class="tf-vonken"></canvas>
+    </div>
+  </div>
+</section>
+
+<div id="masker">
+  <div class="masker-tekst" id="masker-tekst">STÆL</div>
+  <p class="masker-sub">Staal <span class="ae">◆</span> Glas <span class="ae">◆</span> Licht <span class="ae">◆</span> Ruimte</p>
+</div>
+
+<section id="livearchitect">
+  <div class="kern">
+    <h2 class="sectiekop onthul">Live <span class="accent">Architect</span></h2>
+    <p class="intro-tekst onthul">Ontwerp je woning samen met ons, live. Vul je kavel en wensen in, kies uit vormvarianten, bepaal materiaal en kleur, en draai in 3D om je woning heen. Zet je opmerkingen direct óp het model; wij passen aan terwijl je meekijkt.</p>
+    <div class="la-video onthul"><span>▶</span>Video volgt: zo werkt Live Architect</div>
+    <div class="hero-cta onthul" style="margin-top:1.8rem;display:flex">
+      <button class="knop" id="la-open">Probeer de demo</button>
+      <a class="knop stil" href="#contact">Plan een Live Architect-sessie</a>
+    </div>
+  </div>
+</section>
+
+<section id="projecten">
+  <div class="kern">
+    <h2 class="sectiekop onthul">Wonen in <span class="accent">staal</span></h2>
+    <p class="intro-tekst onthul">Van loftwoning tot paviljoen: het stalen frame bepaalt wat er kan, jij bepaalt hoe het voelt. Een beeld van de mogelijkheden.</p>
+    <div class="mozaiek">
+      <figure class="tegel t1 onthul" data-index="0"><img src="assets/huis1.jpg" alt="Schuurwoning met dubbelhoge glazen topgevel en spiegelvijver" loading="lazy"><figcaption>VIDE — dubbelhoge glasgevel aan het water</figcaption></figure>
+      <figure class="tegel t2 onthul" data-index="1"><img src="assets/huis2.jpg" alt="Moderne schuurwoning aan het water met molen in de polder" loading="lazy"><figcaption>POLDER — de moderne schuurwoning</figcaption></figure>
+      <figure class="tegel t3 onthul" data-index="2"><img src="assets/huis3.jpg" alt="Villa met glazen topgevel aan een vaart" loading="lazy"><figcaption>VAART — landelijk verfijnd wonen</figcaption></figure>
+      <figure class="tegel t4 onthul" data-index="3"><img src="assets/huis4.jpg" alt="Schuurwoning aan de dijk met weiland en dorpsgezicht" loading="lazy"><figcaption>DIJK — schuurwoning in het open land</figcaption></figure>
+      <figure class="tegel t5 onthul" data-index="4"><img src="assets/huis5.jpg" alt="Langgerekte woning met koperkleurig dak en houten gevel" loading="lazy"><figcaption>LANGHUIS — koperen daklijn boven hout</figcaption></figure>
+      <figure class="tegel t6 onthul" data-index="5"><img src="assets/huis6.jpg" alt="Woning aan de plas met aanlegsteiger en sloep" loading="lazy"><figcaption>ANKER — thuis aan de plas</figcaption></figure>
+    </div>
+    <p class="galerij-voet onthul">Conceptbeelden ter inspiratie. Ons eerste gerealiseerde project volgt hier binnenkort.</p>
+  </div>
+</section>
+
+<div id="lightbox" role="dialog" aria-label="Fotoweergave">
+  <button id="lb-sluit" aria-label="Sluiten">×</button>
+  <button id="lb-vorige" aria-label="Vorige">‹</button>
+  <img src="" alt="">
+  <button id="lb-volgende" aria-label="Volgende">›</button>
+</div>
+
+<div class="lint" aria-hidden="true">
+  <div class="lint-baan">
+    <span>STAAL <i>◆</i> GLAS <i>◆</i> LICHT <i>◆</i> RUIMTE <i>◆</i> OVERSPANNING <i>◆</i> PRECISIE <i>◆</i></span>
+    <span>STAAL <i>◆</i> GLAS <i>◆</i> LICHT <i>◆</i> RUIMTE <i>◆</i> OVERSPANNING <i>◆</i> PRECISIE <i>◆</i></span>
+  </div>
+</div>
+
+<section id="waarom">
+  <div class="kern">
+    <h2 class="sectiekop onthul">Waarom <span class="accent">staal</span></h2>
+    <p class="intro-tekst onthul">Staal is geen stijlkeuze alleen. Het is een constructief besluit met gevolgen voor ruimte, bouwtijd en levensduur.</p>
+    <div class="tab-balk onthul" role="tablist">
+      <button class="tab actief" data-tab="0" role="tab">Overspanning</button>
+      <button class="tab" data-tab="1" role="tab">Bouwtijd</button>
+      <button class="tab" data-tab="2" role="tab">Circulair</button>
+      <button class="tab" data-tab="3" role="tab">Onderhoud</button>
+      <div id="tab-lijn"></div>
+    </div>
+    <div class="tab-inhoud actief">
+      <div>
+        <h3>Ruimte zonder tussenmuren</h3>
+        <p>Een stalen frame draagt zichzelf. Daardoor zijn vrije overspanningen mogelijk die in traditionele bouw dragende wanden vereisen: open plattegronden, dubbelhoge vides en gevels die vrijwel volledig uit glas bestaan. De indeling blijft bovendien aanpasbaar, ook over twintig jaar.</p>
+      </div>
+      <div class="tab-stat"><strong>12+ m</strong><span>vrije overspanning zonder dragende binnenwanden</span></div>
+    </div>
+    <div class="tab-inhoud">
+      <div>
+        <h3>Geproduceerd in de werkplaats, gemonteerd op locatie</h3>
+        <p>Het stalen skelet wordt op maat geproduceerd en in dagen gemonteerd, niet in weken gemetseld. Minder weersafhankelijkheid, minder bouwplaatstijd, een strakkere planning. De ruwbouw staat terwijl een traditionele bouw nog in de fundering zit.</p>
+      </div>
+      <div class="tab-stat"><strong>Dagen</strong><span>montagetijd voor het complete staalskelet</span></div>
+    </div>
+    <div class="tab-inhoud">
+      <div>
+        <h3>Het meest hergebruikte bouwmateriaal ter wereld</h3>
+        <p>Staal verliest bij hergebruik geen kwaliteit. Een stalen frame is demontabel, herbruikbaar en volledig recyclebaar, en past daarmee in een circulaire bouweconomie. Gecombineerd met hoogwaardige isolatie ontstaat een woning die zuinig is in gebruik én in materiaal.</p>
+      </div>
+      <div class="tab-stat"><strong>100%</strong><span>recyclebaar zonder kwaliteitsverlies</span></div>
+    </div>
+    <div class="tab-inhoud">
+      <div>
+        <h3>Geen kruip, geen krimp, geen verrassingen</h3>
+        <p>Staal werkt niet zoals hout en scheurt niet zoals metselwerk. Het frame is maatvast en ongevoelig voor vocht, schimmel en ongedierte. Met de juiste conservering en detaillering is een stalen constructie generaties lang onderhoudsarm.</p>
+      </div>
+      <div class="tab-stat"><strong>Maatvast</strong><span>geen werking, geen scheurvorming in de constructie</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="werkwijze">
+  <div class="kern">
+    <h2 class="sectiekop onthul">Van schets tot <span class="accent">sleutel</span></h2>
+    <p class="intro-tekst onthul">Eén aanspreekpunt, vijf heldere fasen. Je weet op elk moment waar je staat.</p>
+    <div class="tijdlijn">
+      <div class="stap onthul"><h3><em>01</em>Kennismaking en haalbaarheid</h3><p>We bespreken je wensen, kavel en budget, en toetsen wat er binnen het bestemmingsplan en Bouwbesluit mogelijk is. Eerlijk advies, ook als staal niet de beste keuze is.</p></div>
+      <div class="stap onthul"><h3><em>02</em>Ontwerp</h3><p>Samen met de architect werken we het ontwerp uit in 3D/BIM. Je ziet je woning voordat er één profiel gezaagd is.</p></div>
+      <div class="stap onthul"><h3><em>03</em>Engineering en vergunning</h3><p>Constructieberekeningen, brandwerendheid, isolatie en de volledige vergunningsaanvraag. Wij kennen de eisen en regelen het traject.</p></div>
+      <div class="stap onthul"><h3><em>04</em>Productie en montage</h3><p>Het staalskelet wordt op maat geproduceerd en door ons eigen team gemonteerd. Strak, snel en met de precisie van industriebouw.</p></div>
+      <div class="stap onthul"><h3><em>05</em>Afbouw en oplevering</h3><p>Van gevel tot interieur coördineren we de afbouw tot en met de sleuteloverdracht. Eén partij, één verantwoordelijkheid.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="bouw">
+  <div class="hscroll" id="hscroll">
+    <div class="hscroll-plak">
+      <div class="hscroll-kop">
+        <h2 class="sectiekop">Op de <span class="accent">bouw</span></h2>
+        <p class="intro-tekst">Vakwerk zie je aan de handen. Scroll door een dag op de bouwplaats.</p>
+      </div>
+      <div class="hscroll-baan" id="hscroll-baan">
+        <figure class="hpaneel"><img src="assets/actie1.jpg" alt="STÆL-team monteert een stalen ligger boven de polder" loading="lazy"><figcaption><em>Montage</em>Het skelet gaat overeind: liggers op de millimeter gesteld</figcaption></figure>
+        <figure class="hpaneel"><img src="assets/actie2.jpg" alt="Team plaatst een grote glasgevel met vacuümheffer, molen op de achtergrond" loading="lazy"><figcaption><em>Gevel</em>Glas van vloer tot nok, geplaatst met vacuümtechniek</figcaption></figure>
+        <figure class="hpaneel"><img src="assets/actie3.jpg" alt="Monteurs schroeven gevelbeplating vast aan de waterkant" loading="lazy"><figcaption><em>Schil</em>Geïsoleerde beplating maakt het frame wind- en waterdicht</figcaption></figure>
+        <figure class="hpaneel"><img src="assets/actie4.jpg" alt="Afmontage van hanglampen in de loftwoning met polderzicht" loading="lazy"><figcaption><em>Afbouw</em>Tot en met het laatste armatuur: één team, één standaard</figcaption></figure>
+      </div>
+      <p class="hscroll-tip">Sfeerbeelden ter illustratie van de werkwijze</p>
+    </div>
+  </div>
+</section>
+
+<section id="statement">
+  <div class="statement-foto" id="parallax"></div>
+  <div class="statement-tekst onthul">
+    <blockquote>Een woning van staal is geen trend. Het is <span class="accent">industrieel erfgoed</span>, vertaald naar hoe we nu willen wonen.</blockquote>
+    <cite>STÆL — mede mogelijk gemaakt door EG Assembly</cite>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="kern">
+    <h2 class="sectiekop onthul">Veelgestelde <span class="accent">vragen</span></h2>
+    <div class="faq-item onthul">
+      <button class="faq-vraag">Is een stalen woning duurder dan traditionele bouw?<span class="plus">+</span></button>
+      <div class="faq-antwoord"><p>Per vierkante meter is staalbouw vergelijkbaar met hoogwaardige traditionele bouw. Het verschil zit in wat je ervoor terugkrijgt: grotere overspanningen, meer glas en een kortere bouwtijd. Bij ontwerpen met veel open ruimte is staal vaak juist voordeliger, omdat dure constructieve kunstgrepen vervallen.</p></div>
+    </div>
+    <div class="faq-item onthul">
+      <button class="faq-vraag">Hoe zit het met isolatie en brandveiligheid?<span class="plus">+</span></button>
+      <div class="faq-antwoord"><p>Het stalen frame wordt volledig ingepakt in een hoogwaardig geïsoleerde schil, waardoor koudebruggen worden voorkomen en de woning ruimschoots aan de energie-eisen voldoet. Brandwerendheid wordt geborgd volgens de geldende normen (NEN-EN 13501) met brandwerende bekleding of coating, onderdeel van onze engineering en de vergunningsaanvraag.</p></div>
+    </div>
+    <div class="faq-item onthul">
+      <button class="faq-vraag">Hoe lang duurt het van ontwerp tot oplevering?<span class="plus">+</span></button>
+      <div class="faq-antwoord"><p>Reken op enkele maanden voor ontwerp, engineering en vergunning; de doorlooptijd daarvan bepaalt vooral de gemeente. De bouw zelf is door prefab-productie aanzienlijk korter dan traditioneel: het skelet staat in dagen, de complete ruwbouw in weken.</p></div>
+    </div>
+    <div class="faq-item onthul">
+      <button class="faq-vraag">Kan ik met mijn eigen architect werken?<span class="plus">+</span></button>
+      <div class="faq-antwoord"><p>Zeker. We werken graag samen met jouw architect en sluiten aan met onze constructieve engineering en BIM-modellen. Heb je nog geen architect, dan brengen we je in contact met ontwerpers die staalbouw begrijpen.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="lasnaad"></div>
+
+<section id="contact">
+  <div class="kern contact-grid">
+    <div class="contact-info onthul">
+      <h2 class="sectiekop">Bouw met <span class="accent">ons</span></h2>
+      <p>Een kavel, een schets of alleen nog een idee: we denken graag vrijblijvend mee over wat er in staal mogelijk is.</p>
+      <div class="contact-regel"><span>E-mail</span><span>info@stael.nl</span></div>
+      <div class="contact-regel"><span>Bedrijf</span><span>EG Assembly B.V., Naaldwijk</span></div>
+      <div class="contact-regel"><span>Regio</span><span>Westland en heel Nederland</span></div>
+    </div>
+    <form id="contactvorm" class="onthul">
+      <div class="veld"><label for="naam">Naam</label><input id="naam" type="text" required></div>
+      <div class="veld"><label for="email">E-mailadres</label><input id="email" type="email" required></div>
+      <div class="veld"><label for="bericht">Vertel over je plannen</label><textarea id="bericht" rows="5" required></textarea></div>
+      <button class="knop" type="submit">Verstuur bericht</button>
+      <div id="vorm-dank">Bedankt. We nemen binnen twee werkdagen contact met je op.</div>
+    </form>
+  </div>
+</section>
+
+<div id="la-overlay" aria-hidden="true">
+  <div class="la-kop">
+    <span class="la-titel">LIVE ARCHITECT <em>demo</em></span>
+    <button id="la-sluit" aria-label="Sluiten">×</button>
+  </div>
+  <div class="la-body">
+    <aside class="la-paneel">
+      <div class="la-stap" data-stap="1">
+        <button class="la-stapkop actief">1 — Kavel &amp; programma</button>
+        <div class="la-stapinhoud open">
+          <label>Kavel (m²)<input type="number" id="la-kavel" value="800" min="100" max="10000"></label>
+          <label>Bouwvlak (m²)<input type="number" id="la-bouwvlak" value="150" min="40" max="1000"></label>
+          <label>Gewenst woonoppervlak (m²)<input type="number" id="la-woonopp" value="180" min="40" max="800"></label>
+          <span class="la-veldkop">Indeling</span>
+          <div class="la-keuzes">
+            <button class="la-keuze actief" data-groep="lagen" data-w="1">Alles begane grond</button>
+            <button class="la-keuze" data-groep="lagen" data-w="2">Met verdieping</button>
+          </div>
+          <span class="la-veldkop">Dakvorm</span>
+          <div class="la-keuzes">
+            <button class="la-keuze actief" data-groep="dak" data-w="zadel">Zadeldak</button>
+            <button class="la-keuze" data-groep="dak" data-w="plat">Plat</button>
+            <button class="la-keuze" data-groep="dak" data-w="mix">Mix</button>
+          </div>
+          <p class="la-waarschuwing" id="la-waarschuwing"></p>
+          <button class="knop la-verder" data-naar="2">Genereer varianten</button>
+        </div>
+      </div>
+      <div class="la-stap" data-stap="2">
+        <button class="la-stapkop">2 — Kies je vorm</button>
+        <div class="la-stapinhoud">
+          <div class="la-keuzes la-kolom">
+            <button class="la-keuze actief" data-groep="variant" data-w="A">Variant A — compact</button>
+            <button class="la-keuze" data-groep="variant" data-w="B">Variant B — langhuis</button>
+            <button class="la-keuze" data-groep="variant" data-w="C">Variant C — samengesteld</button>
+          </div>
+          <button class="knop la-verder" data-naar="3">Naar materiaal &amp; kleur</button>
+        </div>
+      </div>
+      <div class="la-stap" data-stap="3">
+        <button class="la-stapkop">3 — Materiaal &amp; kleur</button>
+        <div class="la-stapinhoud">
+          <span class="la-veldkop">Gevel</span>
+          <div class="la-keuzes">
+            <button class="la-keuze actief" data-groep="gevel" data-w="hout">Hout naturel</button>
+            <button class="la-keuze" data-groep="gevel" data-w="zwart">Zwart hout</button>
+            <button class="la-keuze" data-groep="gevel" data-w="wit">Witte steen</button>
+            <button class="la-keuze" data-groep="gevel" data-w="corten">Corten</button>
+          </div>
+          <span class="la-veldkop">Dak</span>
+          <div class="la-keuzes">
+            <button class="la-keuze actief" data-groep="dakmat" data-w="antraciet">Antraciet fels</button>
+            <button class="la-keuze" data-groep="dakmat" data-w="koper">Koper</button>
+            <button class="la-keuze" data-groep="dakmat" data-w="zink">Zink</button>
+          </div>
+          <button class="knop stil la-vulaan" id="la-verras">Verzin het voor mij</button>
+          <button class="knop la-verder" data-naar="4">Bekijken &amp; reageren</button>
+        </div>
+      </div>
+      <div class="la-stap" data-stap="4">
+        <button class="la-stapkop">4 — Bekijken &amp; reageren</button>
+        <div class="la-stapinhoud">
+          <p class="la-uitleg">Klik op de woning om een opmerking te prikken. In de echte sessie past de architect het model live aan.</p>
+          <div id="la-opmerkform">
+            <input type="text" id="la-opmerktekst" placeholder="Bijv. dit raam groter" maxlength="120">
+            <button class="knop" id="la-opmerkopslaan">Prik vast</button>
+          </div>
+          <ul id="la-opmerkingen"></ul>
+        </div>
+      </div>
+    </aside>
+    <div class="la-scene">
+      <canvas id="la-canvas"></canvas>
+      <div class="la-hint">Sleep om te draaien · scroll om te zoomen · klik op de woning voor een opmerking</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span class="merk"><img src="assets/wordmark.png" alt="STÆL"></span>
+  <p>© 2026 STÆL is een handelsnaam van EG Assembly B.V. — Architectural Steel Homes</p>
+</footer>
+
+<script>
+const beweegOK=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fijnePointer=matchMedia('(pointer: fine)').matches;
+
+// ---------- custom cursor ----------
+if(fijnePointer){
+  const stip=document.getElementById('cursor-stip'),ring=document.getElementById('cursor-ring');
+  let mx=innerWidth/2,my=innerHeight/2,rx=mx,ry=my;
+  addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;
+    stip.style.transform=`translate(${mx}px,${my}px) translate(-50%,-50%)`;});
+  (function volg(){
+    rx+=(mx-rx)*.16;ry+=(my-ry)*.16;
+    ring.style.transform=`translate(${rx}px,${ry}px) translate(-50%,-50%)`;
+    requestAnimationFrame(volg);
+  })();
+  document.querySelectorAll('a,button,.tegel,.hpaneel').forEach(el=>{
+    el.addEventListener('mouseenter',()=>ring.classList.add('groot'));
+    el.addEventListener('mouseleave',()=>ring.classList.remove('groot'));
+  });
+}
+
+// ---------- magnetische knoppen ----------
+if(fijnePointer&&beweegOK){
+  document.querySelectorAll('.knop').forEach(k=>{
+    k.addEventListener('mousemove',e=>{
+      const r=k.getBoundingClientRect();
+      const x=(e.clientX-r.left-r.width/2)/r.width,y=(e.clientY-r.top-r.height/2)/r.height;
+      k.style.transform=`translate(${x*8}px,${y*8}px)`;
+    });
+    k.addEventListener('mouseleave',()=>k.style.transform='');
+  });
+}
+
+// ---------- zoom-hero: automatisch door het logo naar binnen ----------
+const zoomWrap=document.getElementById('zoom-wrap');
+const zoomFoto=document.getElementById('zoom-foto');
+const zoomHint=document.getElementById('zoom-hint');
+const zoomEinde=document.getElementById('zoom-einde');
+const zoomDoek=document.getElementById('zoom-doek');
+function zoomOrigin(){
+  const maskW=Math.min(.64*innerWidth,540);
+  const links=(innerWidth-maskW)/2, boven=innerHeight*.44-maskW/2;
+  const ox=links+.57*maskW, oy=boven+.66*maskW;
+  zoomWrap.style.transformOrigin=ox+'px '+oy+'px';
+  zoomFoto.style.transformOrigin=ox+'px '+oy+'px';
+}
+zoomOrigin();
+addEventListener('resize',zoomOrigin);
+function zoomIntro(){
+  if(!beweegOK){zoomEinde.classList.add('zichtbaar');zoomHint.style.opacity=0;return;}
+  const wacht=1500, duur=2800, t0=performance.now();
+  function frame(t){
+    const ruw=(t-t0-wacht)/duur;
+    const p=Math.min(Math.max(ruw,0),1);
+    const e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2; // easeInOutCubic
+    const s=1+Math.pow(e,1.45)*42;
+    zoomWrap.style.transform='scale('+s+')';
+    zoomFoto.style.transform='scale('+(1/s)+')';
+    zoomHint.style.opacity=e<.04?1:0;
+    zoomDoek.style.opacity=e>.62?Math.min((e-.62)/.3,1):0;
+    if(e>.82)zoomEinde.classList.add('zichtbaar');
+    document.getElementById('vonken').style.opacity=Math.max(1-e*2.2,0);
+    if(p<1)requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+addEventListener('load',zoomIntro);
+
+// ---------- scroll: voortgang, nav, parallax, masker, hscroll ----------
+const voortgang=document.getElementById('voortgang');
+const navigatie=document.getElementById('navigatie');
+const maskerTekst=document.getElementById('masker-tekst');
+const hscroll=document.getElementById('hscroll');
+const hscrollBaan=document.getElementById('hscroll-baan');
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  voortgang.style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+  navigatie.classList.toggle('vast',h.scrollTop>60);
+  // statement parallax
+  const p=document.getElementById('parallax');
+  const r=p.parentElement.getBoundingClientRect();
+  if(r.bottom>0&&r.top<innerHeight){
+    p.style.transform='scale(1.12) translateY('+((r.top+r.height/2-innerHeight/2)*-0.06)+'px)';
+  }
+  // masker: beeld schuift door de letters
+  if(beweegOK){
+    const m=maskerTekst.getBoundingClientRect();
+    if(m.bottom>0&&m.top<innerHeight){
+      const f=1-(m.top+m.height/2)/innerHeight;
+      maskerTekst.style.backgroundPosition='center '+(15+f*45)+'%';
+    }
+  }
+  // horizontale bouwsectie
+  const hs=hscroll.getBoundingClientRect();
+  if(hs.top<=0&&hs.bottom>=innerHeight){
+    const voortg=Math.min(Math.max(-hs.top/(hs.height-innerHeight),0),1);
+    const afstand=hscrollBaan.scrollWidth-innerWidth;
+    hscrollBaan.style.transform='translateX('+(-voortg*afstand)+'px)';
+  }else if(hs.top>0){hscrollBaan.style.transform='translateX(0)';}
+},{passive:true});
+
+// ---------- mobiel menu ----------
+const menuknop=document.getElementById('menuknop');
+const navlinks=document.getElementById('navlinks');
+menuknop.addEventListener('click',()=>navlinks.classList.toggle('open'));
+navlinks.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>navlinks.classList.remove('open')));
+
+// ---------- onthullen bij scroll ----------
+const kijker=new IntersectionObserver(items=>{
+  items.forEach(i=>{if(i.isIntersecting){i.target.classList.add('zichtbaar');kijker.unobserve(i.target);}});
+},{threshold:.15});
+document.querySelectorAll('.onthul,.stap,.over-foto').forEach(el=>kijker.observe(el));
+
+// ---------- lasnaad gloeit bij zicht ----------
+const naadkijker=new IntersectionObserver(items=>{
+  items.forEach(i=>{if(i.isIntersecting){i.target.classList.add('gloeit');naadkijker.unobserve(i.target);}});
+},{threshold:.9});
+document.querySelectorAll('.lasnaad').forEach(el=>naadkijker.observe(el));
+
+// ---------- tellers ----------
+const telkijker=new IntersectionObserver(items=>{
+  items.forEach(i=>{
+    if(!i.isIntersecting)return;
+    const el=i.target,eind=parseInt(el.dataset.teller),
+          start=parseInt(el.dataset.vanaf||0),suffix=el.dataset.suffix||'';
+    const t0=performance.now(),duur=1600;
+    function stap(t){
+      const p=Math.min((t-t0)/duur,1),e=1-Math.pow(1-p,3);
+      el.textContent=Math.round(start+(eind-start)*e)+suffix;
+      if(p<1)requestAnimationFrame(stap);
+    }
+    requestAnimationFrame(stap);
+    telkijker.unobserve(el);
+  });
+},{threshold:.6});
+document.querySelectorAll('[data-teller]').forEach(el=>telkijker.observe(el));
+
+// ---------- 3D-model naar werkelijkheid (lasnaad + vonken) ----------
+const tf=document.getElementById('transformeer');
+if(tf){
+  const tfEcht=tf.querySelector('.tf-echt'),tfCanv=tf.querySelector('.tf-vonken'),
+        tfCtx=tfCanv.getContext('2d');
+  let tfBezig=false;
+  function tfMaat(){tfCanv.width=tf.clientWidth;tfCanv.height=tf.clientHeight;}
+  tfMaat();addEventListener('resize',tfMaat);
+  function tfSpeel(){
+    if(tfBezig)return;tfBezig=true;
+    if(!beweegOK){tfEcht.style.clipPath='inset(0 0 0 0)';tfBezig=false;return;}
+    tfEcht.style.clipPath='inset(0 100% 0 0)';
+    const duur=2400,t0=performance.now();let dl=[];
+    function frame(t){
+      const p=Math.min((t-t0)/duur,1);
+      const e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+      const rand=e*tfCanv.width;
+      tfEcht.style.clipPath='inset(0 '+((1-e)*100)+'% 0 0)';
+      if(p<1){for(let i=0;i<16;i++){
+        dl.push({x:rand+(Math.random()-.5)*6,y:Math.random()*tfCanv.height,
+          vx:(Math.random()-.3)*2.6,vy:(Math.random()-.5)*2.2,
+          r:.8+Math.random()*2.2,leven:0,max:26+Math.random()*30});}}
+      tfCtx.clearRect(0,0,tfCanv.width,tfCanv.height);
+      if(p<1){
+        tfCtx.shadowColor='rgba(232,180,140,.9)';tfCtx.shadowBlur=18;
+        tfCtx.fillStyle='rgba(232,180,140,.85)';
+        tfCtx.fillRect(rand-1.2,0,2.4,tfCanv.height);
+      }
+      dl.forEach(d=>{d.x+=d.vx;d.y+=d.vy;d.vy+=.02;d.leven++;
+        const a=1-d.leven/d.max;if(a<=0)return;
+        tfCtx.shadowBlur=8;tfCtx.shadowColor='rgba(201,138,94,.9)';
+        tfCtx.fillStyle='rgba(232,180,140,'+(a*.9).toFixed(3)+')';
+        tfCtx.beginPath();tfCtx.arc(d.x,d.y,d.r*a+.3,0,7);tfCtx.fill();});
+      dl=dl.filter(d=>d.leven<d.max);
+      if(p<1||dl.length){requestAnimationFrame(frame);}
+      else{tfCtx.clearRect(0,0,tfCanv.width,tfCanv.height);tfBezig=false;}
+    }
+    requestAnimationFrame(frame);
+  }
+  new IntersectionObserver((items,obs)=>{
+    items.forEach(i=>{if(i.isIntersecting){setTimeout(tfSpeel,400);obs.disconnect();}});
+  },{threshold:.45}).observe(tf);
+  tf.addEventListener('click',tfSpeel);
+}
+
+// ---------- tegel-tilt (3D) ----------
+if(fijnePointer&&beweegOK){
+  document.querySelectorAll('.tegel').forEach(t=>{
+    t.addEventListener('mousemove',e=>{
+      const r=t.getBoundingClientRect();
+      const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;
+      t.style.transform=`rotateY(${x*5}deg) rotateX(${y*-5}deg)`;
+    });
+    t.addEventListener('mouseleave',()=>t.style.transform='');
+  });
+}
+
+// ---------- tabs ----------
+const tabs=[...document.querySelectorAll('.tab')];
+const inhouden=[...document.querySelectorAll('.tab-inhoud')];
+const tablijn=document.getElementById('tab-lijn');
+function lijnNaar(tab){tablijn.style.left=tab.offsetLeft+'px';tablijn.style.width=tab.offsetWidth+'px';}
+tabs.forEach(tab=>tab.addEventListener('click',()=>{
+  tabs.forEach(t=>t.classList.remove('actief'));
+  inhouden.forEach(c=>c.classList.remove('actief'));
+  tab.classList.add('actief');
+  inhouden[+tab.dataset.tab].classList.add('actief');
+  lijnNaar(tab);
+}));
+addEventListener('load',()=>lijnNaar(tabs[0]));
+addEventListener('resize',()=>lijnNaar(document.querySelector('.tab.actief')));
+
+// ---------- lightbox ----------
+const lb=document.getElementById('lightbox'),lbImg=lb.querySelector('img');
+const tegels=[...document.querySelectorAll('.tegel')];
+let lbIndex=0;
+function toonFoto(i){
+  lbIndex=(i+tegels.length)%tegels.length;
+  const bron=tegels[lbIndex].querySelector('img');
+  lbImg.src=bron.src;lbImg.alt=bron.alt;
+}
+tegels.forEach(t=>t.addEventListener('click',()=>{toonFoto(+t.dataset.index);lb.classList.add('open');}));
+document.getElementById('lb-sluit').addEventListener('click',()=>lb.classList.remove('open'));
+document.getElementById('lb-vorige').addEventListener('click',e=>{e.stopPropagation();toonFoto(lbIndex-1);});
+document.getElementById('lb-volgende').addEventListener('click',e=>{e.stopPropagation();toonFoto(lbIndex+1);});
+lb.addEventListener('click',e=>{if(e.target===lb)lb.classList.remove('open');});
+addEventListener('keydown',e=>{
+  if(!lb.classList.contains('open'))return;
+  if(e.key==='Escape')lb.classList.remove('open');
+  if(e.key==='ArrowLeft')toonFoto(lbIndex-1);
+  if(e.key==='ArrowRight')toonFoto(lbIndex+1);
+});
+
+// ---------- faq ----------
+document.querySelectorAll('.faq-vraag').forEach(v=>v.addEventListener('click',()=>{
+  const item=v.parentElement,antwoord=item.querySelector('.faq-antwoord'),open=item.classList.contains('open');
+  document.querySelectorAll('.faq-item.open').forEach(o=>{o.classList.remove('open');o.querySelector('.faq-antwoord').style.maxHeight=null;});
+  if(!open){item.classList.add('open');antwoord.style.maxHeight=antwoord.scrollHeight+'px';}
+}));
+
+// ---------- contactformulier ----------
+document.getElementById('contactvorm').addEventListener('submit',e=>{
+  e.preventDefault();
+  document.getElementById('vorm-dank').style.display='block';
+  e.target.querySelectorAll('input,textarea,button').forEach(el=>el.disabled=true);
+});
+
+// ---------- vonken (rustig, subtiel) ----------
+const doek=document.getElementById('vonken'),ctx=doek.getContext('2d');
+let vonkjes=[];
+function maatDoek(){doek.width=doek.offsetWidth;doek.height=doek.offsetHeight;}
+maatDoek();addEventListener('resize',maatDoek);
+function nieuwVonkje(){
+  return{x:Math.random()*doek.width,y:doek.height+10,
+    vx:(Math.random()-.5)*.22,vy:-(.18+Math.random()*.4),
+    r:.6+Math.random()*1.5,leven:0,maxLeven:420+Math.random()*380};
+}
+if(beweegOK){
+  for(let i=0;i<26;i++){const v=nieuwVonkje();v.y=Math.random()*doek.height;v.leven=Math.random()*v.maxLeven;vonkjes.push(v);}
+  (function teken(){
+    ctx.clearRect(0,0,doek.width,doek.height);
+    vonkjes.forEach((v,i)=>{
+      v.x+=v.vx;v.y+=v.vy;v.leven++;
+      const fase=v.leven/v.maxLeven,alfa=fase<.15?fase/.15:1-((fase-.15)/.85);
+      ctx.beginPath();
+      ctx.fillStyle='rgba(232,180,140,'+(alfa*.5).toFixed(3)+')';
+      ctx.shadowColor='rgba(201,138,94,.8)';ctx.shadowBlur=6;
+      ctx.arc(v.x,v.y,v.r,0,7);ctx.fill();
+      if(v.leven>=v.maxLeven||v.y<-10)vonkjes[i]=nieuwVonkje();
+    });
+    requestAnimationFrame(teken);
+  })();
+}
+
+// ================= LIVE ARCHITECT DEMO =================
+(function(){
+const overlay=document.getElementById('la-overlay');
+const openKnop=document.getElementById('la-open');
+if(!overlay||!openKnop)return;
+
+const st={kavel:800,bouwvlak:150,woonopp:180,lagen:1,dak:'zadel',variant:'A',gevel:'hout',dakmat:'antraciet'};
+let scene,camera,renderer,huis,grond,raycaster,draaiend=false;
+let theta=.85,phi=1.15,afstand=26,doelH=3;
+let pins=[],pinTeller=0,pendingPunt=null,laLoopt=false;
+
+// ---------- texturen ----------
+function streepTextuur(basis,streep,breed){
+  const c=document.createElement('canvas');c.width=256;c.height=256;
+  const x=c.getContext('2d');x.fillStyle=basis;x.fillRect(0,0,256,256);
+  x.fillStyle=streep;
+  for(let i=0;i<256;i+=breed){x.fillRect(i,0,1.4,256);}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,1);
+  return t;
+}
+function gevelMat(){
+  if(st.gevel==='hout')return new THREE.MeshStandardMaterial({map:streepTextuur('#8f7355','#6e5740',14),roughness:.85});
+  if(st.gevel==='zwart')return new THREE.MeshStandardMaterial({map:streepTextuur('#1f1f22','#0e0e10',14),roughness:.7});
+  if(st.gevel==='wit')return new THREE.MeshStandardMaterial({map:streepTextuur('#e8e4dc','#d5d0c6',26),roughness:.9});
+  return new THREE.MeshStandardMaterial({map:streepTextuur('#8a5637','#6d4229',20),roughness:.8,metalness:.25});
+}
+function dakMat(){
+  if(st.dakmat==='antraciet')return new THREE.MeshStandardMaterial({color:0x26262a,roughness:.6,metalness:.35});
+  if(st.dakmat==='koper')return new THREE.MeshStandardMaterial({color:0xc98a5e,roughness:.45,metalness:.75});
+  return new THREE.MeshStandardMaterial({color:0x8d949c,roughness:.5,metalness:.6});
+}
+let glasMat,kozijnMat;
+
+// ---------- maatvoering ----------
+function maten(){
+  const lagenEff=st.lagen===2?1.8:1;
+  const nodig=st.woonopp/lagenEff;
+  const voet=Math.min(nodig,st.bouwvlak);
+  const ratio=st.variant==='B'?2.5:(st.variant==='C'?1.35:1.7);
+  const b=Math.sqrt(voet/ratio), d=voet/b;   // b = gevelbreedte, d = diepte
+  const muurH=st.lagen===2?5.8:3.1;
+  const nokH=Math.min(b*.62,st.lagen===2?3.6:3.2);
+  return {b,d,muurH,nokH,voet,past:nodig<=st.bouwvlak};
+}
+
+// ---------- huis bouwen ----------
+function gevelVolume(b,d,muurH,nokH,metZadel){
+  const g=new THREE.Group();
+  const s=new THREE.Shape();
+  s.moveTo(-b/2,0);s.lineTo(b/2,0);s.lineTo(b/2,muurH);
+  if(metZadel){s.lineTo(0,muurH+nokH);}
+  s.lineTo(-b/2,muurH);s.closePath();
+  const geo=new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:false});
+  geo.translate(0,0,-d/2);
+  const romp=new THREE.Mesh(geo,gevelMat());
+  romp.castShadow=romp.receiveShadow=true;
+  g.add(romp);
+  if(metZadel){
+    const dakL=Math.sqrt((b/2)*(b/2)+nokH*nokH)+.55;
+    const hoek=Math.atan2(nokH,b/2);
+    [[-1,1],[1,-1]].forEach(([kant,rot])=>{
+      const plaat=new THREE.Mesh(new THREE.BoxGeometry(dakL,.12,d+.7),dakMat());
+      plaat.position.set(kant*b/4,muurH+nokH/2+.10,0);
+      plaat.rotation.z=rot*hoek;
+      plaat.castShadow=true;g.add(plaat);
+    });
+  } else {
+    const plat=new THREE.Mesh(new THREE.BoxGeometry(b+.4,.18,d+.4),dakMat());
+    plat.position.y=muurH+.09;plat.castShadow=true;g.add(plat);
+  }
+  // glazen topgevel voor, ramen zij
+  const glasB=b*.55, glasH=metZadel?muurH+nokH*.7:muurH*.8;
+  const glas=new THREE.Mesh(new THREE.PlaneGeometry(glasB,glasH),glasMat);
+  glas.position.set(0,glasH/2+.05,d/2+.03);g.add(glas);
+  const kozijn=new THREE.Mesh(new THREE.PlaneGeometry(glasB+.16,glasH+.16),kozijnMat);
+  kozijn.position.set(0,glasH/2+.05,d/2+.02);g.add(kozijn);
+  for(let i=0;i<3;i++){
+    const raam=new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.5),glasMat);
+    raam.position.set(b/2+.03,muurH*.5,-d/2+d*(0.25+i*0.25));
+    raam.rotation.y=Math.PI/2;g.add(raam);
+  }
+  return g;
+}
+function bouwHuis(){
+  if(huis){scene.remove(huis);}
+  wisPins();
+  const m=maten();
+  huis=new THREE.Group();
+  if(st.variant==='C'){
+    const hoofdD=m.d*.62;
+    const hoofd=gevelVolume(m.b,hoofdD,m.muurH,m.nokH,st.dak!=='plat');
+    hoofd.position.z=(m.d-hoofdD)/2;
+    const bijB=m.b*.72, bijD=m.d-hoofdD;
+    const bij=gevelVolume(bijB,bijD,Math.max(m.muurH*.55,2.7),0,st.dak==='zadel'&&false);
+    bij.position.z=-(m.d-bijD)/2; bij.position.x=(m.b-bijB)/-2;
+    huis.add(hoofd,bij);
+  } else {
+    huis.add(gevelVolume(m.b,m.d,m.muurH,m.nokH,st.dak!=='plat'));
+  }
+  if(st.dak==='mix'&&st.variant!=='C'){
+    const luifel=new THREE.Mesh(new THREE.BoxGeometry(m.b*.5,.14,3),dakMat());
+    luifel.position.set(m.b*.35,m.muurH*.55,m.d/2+1.4);huis.add(luifel);
+  }
+  scene.add(huis);
+  doelH=(m.muurH+(st.dak!=='plat'?m.nokH:0))/2;
+  afstand=Math.max(m.b,m.d)*2.1+6;
+  tekenGrond(m);
+}
+function tekenGrond(m){
+  if(grond)scene.remove(grond);
+  grond=new THREE.Group();
+  const kavelZ=Math.sqrt(st.kavel);
+  const gras=new THREE.Mesh(new THREE.CircleGeometry(kavelZ*1.15,48),
+    new THREE.MeshStandardMaterial({color:0x2c3527,roughness:1}));
+  gras.rotation.x=-Math.PI/2;gras.receiveShadow=true;grond.add(gras);
+  function kader(zijde,kleur,y){
+    const h=zijde/2;
+    const pts=[new THREE.Vector3(-h,y,-h),new THREE.Vector3(h,y,-h),new THREE.Vector3(h,y,h),new THREE.Vector3(-h,y,h),new THREE.Vector3(-h,y,-h)];
+    const geo=new THREE.BufferGeometry().setFromPoints(pts);
+    const lijn=new THREE.Line(geo,new THREE.LineBasicMaterial({color:kleur}));
+    grond.add(lijn);
+  }
+  kader(kavelZ,0x4a4a50,.02);
+  kader(Math.sqrt(st.bouwvlak),0xc98a5e,.03);
+  scene.add(grond);
+}
+
+// ---------- pins ----------
+function pinSprite(nr){
+  const c=document.createElement('canvas');c.width=c.height=96;
+  const x=c.getContext('2d');
+  x.fillStyle='#c98a5e';x.beginPath();x.arc(48,48,40,0,7);x.fill();
+  x.fillStyle='#131315';x.font='bold 44px Archivo,sans-serif';x.textAlign='center';x.textBaseline='middle';
+  x.fillText(nr,48,52);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));
+  sp.scale.set(1.1,1.1,1);return sp;
+}
+function wisPins(){pins.forEach(p=>scene.remove(p.sprite));pins=[];pinTeller=0;
+  const ul=document.getElementById('la-opmerkingen');if(ul)ul.innerHTML='';}
+function toonOpmerkingen(){
+  const ul=document.getElementById('la-opmerkingen');ul.innerHTML='';
+  pins.forEach(p=>{
+    const li=document.createElement('li');
+    li.innerHTML='<em>'+p.nr+'</em><span>'+p.tekst.replace(/</g,'&lt;')+'</span>';
+    const del=document.createElement('button');del.textContent='×';del.title='Verwijderen';
+    del.addEventListener('click',()=>{scene.remove(p.sprite);pins=pins.filter(q=>q!==p);toonOpmerkingen();});
+    li.appendChild(del);ul.appendChild(li);
+  });
+}
+
+// ---------- scene ----------
+function initScene(){
+  glasMat=new THREE.MeshStandardMaterial({color:0x2a3540,roughness:.15,metalness:.85,emissive:0x33240f,emissiveIntensity:.5});
+  kozijnMat=new THREE.MeshStandardMaterial({color:0x141416,roughness:.5,metalness:.5});
+  const canvas=document.getElementById('la-canvas');
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x18181b);
+  scene.fog=new THREE.Fog(0x18181b,60,140);
+  camera=new THREE.PerspectiveCamera(46,1,.1,300);
+  const hemel=new THREE.HemisphereLight(0xcfd6e0,0x22201c,.85);scene.add(hemel);
+  const zon=new THREE.DirectionalLight(0xf0c9a0,1.15);
+  zon.position.set(18,26,14);zon.castShadow=true;
+  zon.shadow.mapSize.set(1024,1024);
+  zon.shadow.camera.left=zon.shadow.camera.bottom=-30;
+  zon.shadow.camera.right=zon.shadow.camera.top=30;
+  scene.add(zon);
+  raycaster=new THREE.Raycaster();
+  bouwHuis();
+  maat();
+}
+function maat(){
+  if(!renderer)return;
+  const el=document.querySelector('.la-scene');
+  renderer.setSize(el.clientWidth,el.clientHeight,false);
+  camera.aspect=el.clientWidth/el.clientHeight;camera.updateProjectionMatrix();
+}
+addEventListener('resize',()=>{if(overlay.classList.contains('open'))maat();});
+function loop(){
+  if(!laLoopt)return;
+  phi=Math.min(Math.max(phi,.35),1.45);
+  afstand=Math.min(Math.max(afstand,8),90);
+  camera.position.set(afstand*Math.sin(phi)*Math.cos(theta),afstand*Math.cos(phi)+doelH,afstand*Math.sin(phi)*Math.sin(theta));
+  camera.lookAt(0,doelH,0);
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+
+// ---------- interactie 3D ----------
+let sleepStart=null;
+const canvasEl=document.getElementById('la-canvas');
+canvasEl.addEventListener('pointerdown',e=>{sleepStart={x:e.clientX,y:e.clientY,t:performance.now()};draaiend=true;canvasEl.setPointerCapture(e.pointerId);});
+canvasEl.addEventListener('pointermove',e=>{
+  if(!draaiend||!sleepStart)return;
+  theta+=e.movementX*.006;phi-=e.movementY*.005;
+});
+canvasEl.addEventListener('pointerup',e=>{
+  draaiend=false;
+  if(!sleepStart)return;
+  const dx=Math.abs(e.clientX-sleepStart.x),dy=Math.abs(e.clientY-sleepStart.y);
+  const dt=performance.now()-sleepStart.t;
+  if(dx<6&&dy<6&&dt<400)klikOpHuis(e);
+  sleepStart=null;
+});
+canvasEl.addEventListener('wheel',e=>{e.preventDefault();afstand+=e.deltaY*.02;},{passive:false});
+function klikOpHuis(e){
+  const r=canvasEl.getBoundingClientRect();
+  const mx=((e.clientX-r.left)/r.width)*2-1,my=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera({x:mx,y:my},camera);
+  const hits=raycaster.intersectObjects(huis.children,true);
+  if(!hits.length)return;
+  pendingPunt=hits[0].point.clone();
+  naarStap('4');
+  const form=document.getElementById('la-opmerkform');
+  form.classList.add('open');
+  document.getElementById('la-opmerktekst').focus();
+}
+document.getElementById('la-opmerkopslaan').addEventListener('click',()=>{
+  const inp=document.getElementById('la-opmerktekst');
+  const tekst=inp.value.trim();
+  if(!tekst||!pendingPunt)return;
+  pinTeller++;
+  const sp=pinSprite(pinTeller);
+  sp.position.copy(pendingPunt);
+  scene.add(sp);
+  pins.push({nr:pinTeller,tekst,sprite:sp});
+  inp.value='';pendingPunt=null;
+  document.getElementById('la-opmerkform').classList.remove('open');
+  toonOpmerkingen();
+});
+
+// ---------- paneel ----------
+function naarStap(nr){
+  document.querySelectorAll('.la-stapkop').forEach(k=>k.classList.remove('actief'));
+  document.querySelectorAll('.la-stapinhoud').forEach(i=>i.classList.remove('open'));
+  const stap=document.querySelector('.la-stap[data-stap="'+nr+'"]');
+  stap.querySelector('.la-stapkop').classList.add('actief');
+  stap.querySelector('.la-stapinhoud').classList.add('open');
+}
+document.querySelectorAll('.la-stapkop').forEach((k,i)=>k.addEventListener('click',()=>naarStap(String(i+1))));
+document.querySelectorAll('.la-verder').forEach(k=>k.addEventListener('click',()=>{leesVelden();bouwHuis();naarStap(k.dataset.naar);}));
+document.querySelectorAll('.la-keuze').forEach(k=>k.addEventListener('click',()=>{
+  document.querySelectorAll('.la-keuze[data-groep="'+k.dataset.groep+'"]').forEach(x=>x.classList.remove('actief'));
+  k.classList.add('actief');
+  const w=k.dataset.w;
+  if(k.dataset.groep==='lagen')st.lagen=+w;else st[k.dataset.groep]=w;
+  leesVelden();bouwHuis();
+}));
+['la-kavel','la-bouwvlak','la-woonopp'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',()=>{leesVelden();bouwHuis();});
+});
+function leesVelden(){
+  st.kavel=+document.getElementById('la-kavel').value||800;
+  st.bouwvlak=+document.getElementById('la-bouwvlak').value||150;
+  st.woonopp=+document.getElementById('la-woonopp').value||180;
+  const m=maten();
+  document.getElementById('la-waarschuwing').textContent=
+    m.past?'':'Let op: gewenst oppervlak past niet binnen het bouwvlak. Kies een verdieping of vergroot het bouwvlak.';
+}
+document.getElementById('la-verras').addEventListener('click',()=>{
+  const g=['hout','zwart','wit','corten'],d=['antraciet','koper','zink'];
+  st.gevel=g[Math.floor(Math.random()*g.length)];
+  st.dakmat=d[Math.floor(Math.random()*d.length)];
+  ['gevel','dakmat'].forEach(gr=>{
+    document.querySelectorAll('.la-keuze[data-groep="'+gr+'"]').forEach(x=>
+      x.classList.toggle('actief',x.dataset.w===st[gr]));
+  });
+  bouwHuis();
+});
+
+// ---------- openen/sluiten ----------
+openKnop.addEventListener('click',()=>{
+  if(!window.THREE){alert('3D-omgeving laadt nog, probeer het over een paar seconden opnieuw.');return;}
+  overlay.classList.add('open');
+  document.body.style.overflow='hidden';
+  if(!renderer)initScene();else maat();
+  laLoopt=true;loop();
+});
+document.getElementById('la-sluit').addEventListener('click',()=>{
+  overlay.classList.remove('open');
+  document.body.style.overflow='';
+  laLoopt=false;
+});
+})();
+</script>
+</body>
+</html>
