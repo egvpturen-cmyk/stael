@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { genereerVarianten } from './generator.js'
 import { REGELS_DEFAULT } from './ontwerptaal.js'
 import Woning3D from './Woning3D.jsx'
@@ -12,11 +12,11 @@ const START = {
   regels: { ...REGELS_DEFAULT },
 }
 
-const ROMEINS = ['I', 'II', 'III']
+const ROMEINS = ['I', 'II', 'III', 'IV']
 function naamVoor(v, alle) {
-  const zelfde = alle.filter(x => x.typologie.id === v.typologie.id)
-  if (zelfde.length < 2) return v.typologie.naam
-  return v.typologie.naam + ' ' + ROMEINS[zelfde.indexOf(v)]
+  const zelfde = alle.filter(x => x.naam === v.naam)
+  if (zelfde.length < 2) return v.naam
+  return v.naam + ' ' + (ROMEINS[zelfde.indexOf(v)] || zelfde.indexOf(v) + 1)
 }
 
 function Getal({ label, eenheid, waarde, min, max, stap = 1, onChange }) {
@@ -44,13 +44,54 @@ function Keuze({ label, opties, waarde, onChange }) {
   )
 }
 
+function VariantKaart({ v, naam, prog, favoriet, opFavoriet, opGroot }) {
+  return (
+    <article className={'variant' + (favoriet ? ' favoriet' : '')}>
+      {favoriet && <span className="keuzelabel">Jouw keuze</span>}
+      <div className="canvasvak">
+        <Woning3D spec={v} programma={prog} />
+      </div>
+      <div className="variantinfo">
+        <h3>{naam}</h3>
+        <p>{v.beschrijving}</p>
+        <dl>
+          <div><dt>Voetafdruk</dt><dd>{v.voet} m²</dd></div>
+          <div><dt>Woonopp.</dt><dd>≈ {v.opp} m²</dd></div>
+          <div><dt>Goot / nok</dt><dd>{v.goot.toFixed(1)} / {v.nok.toFixed(1)} m</dd></div>
+          {!v.plat && <div><dt>Dakhelling</dt><dd>{v.helling}°</dd></div>}
+        </dl>
+        {!v.past && <p className="waarschuwing">Past niet volledig in het bouwvlak: kies een kleiner woonoppervlak of een verdieping.</p>}
+        <div className="kaartknoppen">
+          <button type="button" onClick={opGroot}>Bekijk groot</button>
+          <button type="button" className={favoriet ? 'stil' : ''} onClick={opFavoriet}>
+            {favoriet ? 'Keuze loslaten' : 'Kies deze'}
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
 export default function App() {
   const [prog, zetProg] = useState(START)
   const [regelsOpen, zetRegelsOpen] = useState(false)
   const [groot, zetGroot] = useState(null)
-  const varianten = useMemo(() => genereerVarianten(prog), [prog])
-  const zet = deel => zetProg(p => ({ ...p, ...deel }))
-  const zetRegel = deel => zetProg(p => ({ ...p, regels: { ...p.regels, ...deel } }))
+  const [ronde, zetRonde] = useState(0)
+  const [favoriet, zetFavoriet] = useState(null)
+  const [laden, zetLaden] = useState(false)
+
+  const varianten = useMemo(() => genereerVarianten(prog, ronde), [prog, ronde])
+  const zet = deel => { zetProg(p => ({ ...p, ...deel })); zetRonde(0) }
+  const zetRegel = deel => { zetProg(p => ({ ...p, regels: { ...p.regels, ...deel } })); zetRonde(0) }
+
+  function nieuweSet() {
+    zetLaden(true)
+    setTimeout(() => { zetRonde(r => r + 1); zetLaden(false) }, 30)
+  }
+
+  useEffect(() => { zetFavoriet(null) }, [prog])
+
+  const lijst = varianten.filter(v => !favoriet || v.id !== favoriet.id)
 
   return (
     <div className="app">
@@ -97,37 +138,33 @@ export default function App() {
         </aside>
 
         <main>
+          <div className="setbalk">
+            <button type="button" className="nieuweset" onClick={nieuweSet} disabled={laden}>
+              Nieuwe varianten ↻
+            </button>
+            {laden && <span className="lader" aria-label="Bezig met genereren" />}
+            <span className="settekst">{varianten.length} vormen bij dit programma · set {ronde + 1}</span>
+          </div>
           <div className="varianten">
-            {varianten.map(v => (
-              <article key={v.id} className="variant">
-                <div className="canvasvak">
-                  <Woning3D spec={v} programma={prog} />
-                </div>
-                <div className="variantinfo">
-                  <h3>{naamVoor(v, varianten)}</h3>
-                  <p>{v.typologie.beschrijving}</p>
-                  <dl>
-                    <div><dt>Voetafdruk</dt><dd>{v.voet} m²</dd></div>
-                    <div><dt>Woonopp.</dt><dd>≈ {v.opp} m²</dd></div>
-                    <div><dt>Goot / nok</dt><dd>{v.goot.toFixed(1)} / {v.nok.toFixed(1)} m</dd></div>
-                    {!v.plat && <div><dt>Dakhelling</dt><dd>{v.helling}°</dd></div>}
-                  </dl>
-                  {!v.past && <p className="waarschuwing">Past niet volledig in het bouwvlak: kies een kleiner woonoppervlak of een verdieping.</p>}
-                  <button type="button" onClick={() => zetGroot(v)}>Bekijk groot</button>
-                </div>
-              </article>
+            {favoriet && (
+              <VariantKaart v={favoriet} naam={naamVoor(favoriet, [favoriet])} prog={prog}
+                favoriet opFavoriet={() => zetFavoriet(null)} opGroot={() => zetGroot(favoriet)} />
+            )}
+            {lijst.map(v => (
+              <VariantKaart key={v.id} v={v} naam={naamVoor(v, varianten)} prog={prog}
+                favoriet={false} opFavoriet={() => zetFavoriet(v)} opGroot={() => zetGroot(v)} />
             ))}
           </div>
         </main>
       </div>
 
       {groot && (
-        <div className="grootvak" role="dialog" aria-label={groot.typologie.naam}>
+        <div className="grootvak" role="dialog" aria-label={groot.naam}>
           <button type="button" className="sluit" onClick={() => zetGroot(null)}>Sluiten ×</button>
           <div className="grootcanvas">
             <Woning3D spec={groot} programma={prog} groot />
           </div>
-          <p className="groottitel">{naamVoor(groot, varianten)} · goot {groot.goot.toFixed(1)} m · nok {groot.nok.toFixed(1)} m</p>
+          <p className="groottitel">{groot.naam} · goot {groot.goot.toFixed(1)} m · nok {groot.nok.toFixed(1)} m</p>
         </div>
       )}
     </div>
