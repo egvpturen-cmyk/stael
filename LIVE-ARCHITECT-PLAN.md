@@ -1,6 +1,6 @@
 # Live Architect: plan
 
-Status: voorstel, wacht op akkoord. Er is nog niets van gebouwd.
+Status: akkoord gegeven. Hosting op Vercel, opslag via Railway, ontwerptaal start vanuit de eigen referentiebeelden in assets/. Bouw gestart met fase 0 en 1.
 
 ## 1. Het einddoel zoals ik het begrijp
 
@@ -61,26 +61,27 @@ Volgorde: eerst route A op niveau brengen (fase 1 en 2), dan pas route B erboven
 
 ### 2.4 Opslag van ontwerpen en opmerkingen
 
-Voorstel: Supabase (Postgres met auth, storage en realtime, royale gratis instap).
+Besloten: Railway, omdat dat al betaald en vertrouwd is. Bewuste afweging: Supabase zou auth, row level security en realtime kant en klaar leveren; met Railway bouwen we dat zelf, dus fase 3 en fase 5 bevatten meer eigen bouwwerk. Geaccepteerd.
 
-- Tabellen: klanten (of alleen e-mail), ontwerpen (JSON-parameterset, naam, tijdstempels), opmerkingen (ontwerp-id, 3D-ankerpunt, onderdeelnaam, tekst, status open/verwerkt, nummer).
-- Toegang: de klant krijgt een deelbare link met een token per ontwerp (geen wachtwoord nodig om te beginnen; optioneel later inloggen via e-mail magic link). Row level security zorgt dat een link alleen het eigen ontwerp opent.
-- Afweging: Firebase kan hetzelfde, maar Supabase is Postgres (makkelijker rapporteren, later koppelen) en past bij de richting die PLAN.md al noemde. Een eigen backend bouwen is nu onnodig gewicht.
+- Railway Postgres als database: ontwerpen (JSON-parameterset, naam, tijdstempels), opmerkingen (ontwerp-id, 3D-ankerpunt, onderdeelnaam, tekst, status open/verwerkt, nummer), e-mailadressen van klanten.
+- Daarvoor een klein API-servicetje op Railway (Node, minimalistisch): endpoints voor ontwerp opslaan/laden via een deelbaar token, opmerkingen toevoegen/afvinken, en e-mail vangen bij het opslaan. De browser praat alleen met deze API, nooit rechtstreeks met de database.
+- Deelbare links werken via een ontwerp-token in de URL, gecontroleerd door onze eigen API.
 - Pins: raycast op het model, opgeslagen met positie plus het onderdeel waarop geklikt is (gevel zuid, raam 3), zodat een pin ook na een modelwijziging zinvol terugkomt of netjes als "vervallen" gemarkeerd wordt.
+- De API komt als api-map in de repo te staan; de map wordt in fase 0 al aangelegd, de API zelf wordt pas in fase 3 gebouwd.
 
 ### 2.5 De live-sessie
 
 Groeipad in twee stappen:
 
 1. Eerst praktisch: "Plan een Live Architect-sessie" opent een agenda (Cal.com of vergelijkbaar). De sessie zelf is een videogesprek met schermdelen waarin STÆL het ontwerp van de klant opent via de deelbare link en live aanpast. Geen extra techniek nodig; dit kan zodra fase 3 er is.
-2. Later echt gedeeld: via Supabase Realtime kijken klant en STÆL in hetzelfde model; wie "presenteert" stuurt camera en wijzigingen, de ander ziet alles direct. Technisch goed haalbaar omdat het hele ontwerp één JSON-state is; het is vooral zorgvuldig synchronisatiewerk.
+2. Later echt gedeeld: via websockets op hetzelfde Railway-servicetje kijken klant en STÆL in hetzelfde model; wie "presenteert" stuurt camera en wijzigingen, de ander ziet alles direct. Technisch goed haalbaar omdat het hele ontwerp één JSON-state is; het is vooral zorgvuldig synchronisatiewerk (meer eigen bouwwerk dan met een kant-en-klare realtime-dienst, zie de afweging in 2.4).
 
 ### 2.6 Hosting en plek op de site
 
-- De app wordt statisch gebouwd (Vite) en kan gewoon mee op GitHub Pages onder /architect/, met een eigen link vanaf de Live Architect-sectie op de site. Geen aparte hosting nodig voor fase 1 en 2.
-- Zodra Supabase meedoet (fase 3) blijft de app statisch; de database praat rechtstreeks met de browser.
-- Alleen de AI-renderlaag (fase 4) heeft een klein serverless tussenstuk nodig zodat de API-sleutel niet in de browser ligt (bijv. Supabase Edge Function of Vercel Function).
-- Later, als het domein stael.nl er is: architect.stael.nl.
+- Besloten: de app draait op Vercel (daar wordt al mee gewerkt, en fase 4 heeft het toch nodig). De app wordt statisch gebouwd met Vite en als eigen Vercel-project uitgerold vanuit de architect-map in de repo.
+- De statische site (index.html) blijft voorlopig op GitHub Pages; de Live Architect-sectie linkt naar de app op Vercel.
+- De AI-renderproxy van fase 4 wordt een endpoint op de Railway-API (zie 2.4), geen aparte serverless functie; zo liggen alle sleutels op één plek.
+- Domein: stael.nl is bezet, het wordt waarschijnlijk staelhome.nl. De app komt dan op architect.staelhome.nl; e-mail wordt info@staelhome.nl.
 
 ### 2.7 Later: richting BIM
 
@@ -91,9 +92,10 @@ Omdat het ontwerp een parameterset is, kan er een exporter bij die IFC (of eerst
 Elke fase levert iets werkends op dat aan klanten te laten zien is.
 
 ### Fase 0: fundament (klein)
-- Aparte app-structuur (Vite + React + react-three-fiber) in de repo, bereikbaar via /architect/.
-- Programma-invoer (stap 1) en de JSON-ontwerpstate, met de huidige generator als tijdelijke inhoud.
-- Demonstreerbaar: dezelfde demo als nu, maar als eigen app met nette invoer; de basis waar alles op stapelt.
+- Aparte app-structuur (Vite + React + react-three-fiber) in de architect-map van de repo, ingericht voor uitrol op Vercel.
+- Api-map aangelegd als plek voor het Railway-servicetje van fase 3 (nog leeg op een leeswijzer na).
+- Programma-invoer (stap 1) en de JSON-ontwerpstate.
+- Demonstreerbaar: de basis waar alles op stapelt, met nette invoer en een eerste model.
 
 ### Fase 1: woninggenerator 2.0 (prioriteit 1 uit PLAN.md)
 - Eerste versie van de kennisbank uit 2.2: web-research naar staalwoning-typologieën, vastgelegd als regels en verhoudingen; door jou te controleren aan de hand van referentiebeelden.
@@ -109,48 +111,55 @@ Elke fase levert iets werkends op dat aan klanten te laten zien is.
 - Demonstreerbaar: de wow-stap; materiaal- en kleurkeuze per vlak op een mooi belicht model. Dit is het niveau "zeer nette archviz", nog zonder AI.
 
 ### Fase 3: bewaren, delen, opmerkingen
-- Supabase: ontwerpen opslaan, deelbare link per ontwerp.
+- Bouw van de Node-API op Railway (in de api-map): ontwerp opslaan/laden via deelbaar token, opmerkingen toevoegen/afvinken, e-mail vangen bij opslaan. Railway Postgres erachter; de browser praat alleen met de API.
+- Deelbare link per ontwerp via het token in de URL.
 - Pins prikken op onderdelen, opmerkingenlijst met status open/verwerkt.
 - "Plan een Live Architect-sessie" gekoppeld aan een echte agenda.
 - Demonstreerbaar: klant ontwerpt thuis, prikt opmerkingen, stuurt de link; STÆL opent hetzelfde ontwerp en ziet alles. De sessie kan vanaf hier al echt plaatsvinden (met schermdelen).
 
 ### Fase 4: de fotostand
-- AI-renderlaag: per variant en camerahoek een fotorealistisch beeld, gestuurd door het 3D-model.
-- Serverless functie voor de API-sleutel; kosten per beeld bewaakt.
+- AI-renderlaag: per variant en camerahoek een fotorealistisch beeld, gestuurd door het 3D-model. Kwaliteit gaat boven kosten; voorkeur voor de beeldgeneratie van OpenAI (gpt-image), met zo nodig een kwaliteitsvergelijking tussen een paar aanbieders waarna de beste wint.
+- Renderproxy als endpoint op de Railway-API (sleutels nooit in de browser), met een maandelijks kostenrapportje; geen krappe limiet die de kwaliteit drukt.
+- Bewaking dat er geen AI-tekstfouten in beeld komen (geen verzonnen opschriften of naambordjes).
 - Demonstreerbaar: knop "maak er een foto van" naast het interactieve model.
 
 ### Fase 5: echt samen kijken
-- Realtime sessiemodus: klant en STÆL in hetzelfde model, presenter-rol, live aanpassen.
+- Realtime sessiemodus via websockets op de Railway-API: klant en STÆL in hetzelfde model, presenter-rol, live aanpassen.
 - Demonstreerbaar: de volwaardige Live Architect-sessie zonder schermdelen.
 
 ### Fase 6 (later): BIM-brug
 - Export van de parameterset richting IFC/SketchUp voor de workflow van EG Assembly.
 
-## 4. Vragen voordat ik begin
+## 4. Besluiten en openstaande punten
+
+Besluiten (akkoord van STÆL):
 
 Techniek en geld:
-1. Budget voor externe diensten: Supabase heeft een gratis instap; AI-renders kosten grofweg 1 tot 10 cent per beeld plus wat serverless-kosten. Is er budget voor die AI-renderlaag, en zo ja, een orde van grootte per maand?
-2. Hosting: mag de app gewoon mee op GitHub Pages (/architect/), of wil je meteen naar iets als Vercel (handig zodra fase 4 een serverless functie nodig heeft)?
-3. Komt stael.nl er binnenkort? Dan houd ik rekening met architect.stael.nl.
+- Hosting: de app op Vercel; de statische site blijft voorlopig op GitHub Pages.
+- Opslag: Railway (Postgres plus eigen Node-API), zie 2.4 inclusief de afweging.
+- AI-renders: kwaliteit gaat boven kosten; dit zijn woningen van een half miljoen, de beelden moeten top zijn. Voorkeur voor OpenAI (gpt-image); in fase 4 desnoods een kwaliteitsvergelijking tussen aanbieders. Wel maandelijks kosteninzicht, geen krappe limiet.
+- Domein: stael.nl is bezet, het wordt waarschijnlijk staelhome.nl (app: architect.staelhome.nl, e-mail: info@staelhome.nl).
 
 Product en kwaliteit:
-4. Wat is "fotorealistisch genoeg" voor jou? Heb je één of twee referentiebeelden van het niveau dat je bij fase 2 (real-time 3D) acceptabel vindt, en het niveau waarvoor je de AI-fotostand echt nodig acht?
-5. Hoe gevoelig ligt AI-beeldgeneratie richting klanten, gezien de AI-tekstfouten op de huidige conceptbeelden? Is een sfeerimpressie met kleine afwijkingen acceptabel als het interactieve model de waarheid blijft?
-6. Welke materialen moeten er minimaal in de bibliotheek bij de eerste oplevering van fase 2? En zijn er STÆL-vaste architectuurkeuzes (kozijnkleur, goothoogtes, raamverhoudingen) die de generator moet afdwingen?
-7. Moeten varianten binnen de regels van een gemiddeld bestemmingsplan blijven (goothoogte, nokhoogte, dakhelling), en zo ja, wil je die grenzen kunnen instellen per kavel?
+- Doelniveau fase 2: goede SketchUp/Enscape-previewkwaliteit; de AI-fotostand komt daarbovenop.
+- AI-sfeerbeelden zijn acceptabel als impressie zolang het interactieve model de waarheid is en er nergens AI-tekstfouten in beeld komen.
+- Materialen en kleuren worden heel uitgebreid, opgebouwd met web-research: houtsoorten en -kleuren, felsdaken in meerdere metalen en kleuren, corten, zink, koper, steensoorten, stucwerk en meer, met per materiaal een ruim kleurenpalet. Gefaseerd opbouwen, maar vanaf het begin ontworpen voor die breedte.
+- Vaste STÆL-regel: kozijnen altijd slank en donker (antraciet of zwart).
+- Bestemmingsplan-grenzen (goothoogte, nokhoogte, dakhelling) instelbaar per kavel, met gangbare defaults.
 
 Klanten en proces:
-8. Mogen klanten zonder account werken met alleen een deelbare link, of wil je vanaf het begin een e-mailadres vangen (magic link) voor opvolging?
-9. Wie behandelt de opmerkingen aan STÆL-kant, en is een simpel intern lijstje per ontwerp genoeg of wil je een dashboard over alle klanten heen?
-10. Welke agenda gebruik je (of wil je gebruiken) voor het plannen van sessies? Cal.com, Calendly, of iets bestaands van EG Assembly of New Way?
-11. Op welke apparaten moet dit vlekkeloos werken? Alleen desktop en tablet, of ook telefoon? Is er een showroom-scenario (groot scherm, touch)?
-12. Alleen Nederlands, of ook Engels?
-
-Planning:
-13. Is de fasevolgorde goed zo, of wil je de fotostand (fase 4) eerder omdat die commercieel het meeste indruk maakt?
-14. Is er een moment waarop je dit wilt kunnen tonen (beurs, klantafspraak), zodat ik daar met de fasering rekening mee kan houden?
+- Klanten werken zonder account via een deelbare link; bij het opslaan wordt wel een e-mailadres gevraagd (opvolging is commercieel belangrijk).
+- Opmerkingen behandelt STÆL zelf; een lijst per ontwerp volstaat, een dashboard komt later.
+- Apparaten: desktop en tablet vlekkeloos, telefoon goed bruikbaar (klanten openen de deellink op hun telefoon). Showroom met touch is leuk voor later, geen eis.
+- Alleen Nederlands voor nu.
+- Fasevolgorde blijft zoals in dit plan: eerst het model op niveau, dan pas de foto.
 
 Ontwerptaal en inspiratie:
-15. Heb je voorbeelden van staalwoningen die je mooi vindt (links, foto's, projectnamen)? Vijf tot tien referenties zijn goud als startpunt van de ontwerptaal; ook één of twee voorbeelden van wat je juist niet wilt helpt enorm.
-16. Zijn er typologieën die er zeker in moeten of juist niet (barnhouse, loftwoning met portaalconstructie, langhuis, plat paviljoen)?
-17. Wil je de kennisbank periodiek laten verversen met nieuwe web-research (bijv. per kwartaal), en wil je nieuwe presets dan eerst zelf goedkeuren voordat klanten ze zien?
+- Startpunt van de ontwerptaal: de eigen referentiebeelden in assets/ (huis1 t/m huis6 en render.jpg). Dat is exact de STÆL-smaak: schuurwoningen en langhuizen in de Nederlandse polder, fels- en koperdaken, hout, dubbelhoge glasgevels.
+- Nadrukkelijk niet: Amerikaanse villa-uitstraling, natuursteen-stapelwanden, bergachtergronden, en generieke witte nieuwbouwdozen.
+- Typologieën die er zeker in moeten: barnhouse/schuurwoning, langhuis, loftwoning met portaalconstructie. Plat paviljoen mag erbij als vierde.
+- Kennisbank per kwartaal verversen met nieuwe web-research; nieuwe presets keurt STÆL eerst zelf goed voordat klanten ze zien.
+
+Nog open:
+- Welke agenda voor het plannen van sessies (Cal.com, Calendly, of iets bestaands van EG Assembly of New Way)? Nodig uiterlijk in fase 3.
+- Is er een demo-moment of deadline waar de fasering rekening mee moet houden?
