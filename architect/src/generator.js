@@ -1,4 +1,4 @@
-import { STAEL, KLEUREN, MASSAS, STRAMIENEN, ELEMENTEN, typologieenVoor } from './ontwerptaal.js'
+import { STAEL, KLEUREN, MASSAS, STRAMIENEN, ELEMENTEN, TYPOLOGIEEN, typologieenVoor } from './ontwerptaal.js'
 
 // deterministische pseudo-random: zelfde programma en ronde geven
 // dezelfde set, een nieuwe ronde geeft echt andere combinaties
@@ -154,6 +154,47 @@ function maakVariant(t, massaWens, prog, seed) {
 
   spec.naam = t.naam + (spec.massa !== 'enkel' ? ' · ' + MASSAS[spec.massa].naam : '')
   spec.beschrijving = maakBeschrijving(spec)
+  return spec
+}
+
+// Deterministische spec uit expliciete parameters, voor de
+// kalibratiepresets (interne nabouwsels van de referenties). Deze specs
+// verschijnen nooit als klantvariant; ze kalibreren en testen de renderer.
+export function bouwSpec(p) {
+  const t = TYPOLOGIEEN.find(x => x.id === p.typologie) || TYPOLOGIEEN[0]
+  const kleur = k => KLEUREN[k] || k
+  const plat = !!p.plat
+  const b = p.b, d = p.d, goot = p.goot
+  const helling = plat ? 0 : (p.helling ?? 48)
+  const nok = plat ? goot : (p.nok ?? goot + Math.tan(grad(helling)) * (b / 2 - Math.abs(p.nokOffset || 0)) )
+  const spec = {
+    id: 'kal-' + (p.id || t.id), typologie: t,
+    lagen: p.lagen ?? 1, past: true, plat,
+    b, d, goot, nok, helling: Math.round(helling),
+    overstek: p.overstek ?? t.overstek,
+    voet: Math.round(b * d), opp: Math.round(b * d),
+    stramienN: p.stramienN ?? Math.max(2, Math.round(d / 2.6)),
+    gevel: kleur(p.gevel || t.gevels[0]),
+    dak: kleur(p.dak || t.daken[0]),
+    gevel2: p.gevel2 ? kleur(p.gevel2) : null,
+    massa: p.massa || 'enkel',
+    nokOffset: p.nokOffset || 0,
+    kop: {
+      stramien: p.stramien || 'stroken',
+      kader: !!p.kader, kaderKleur: p.kader && p.kader.kleur ? kleur(p.kader.kleur) : null,
+      lamellen: !!p.lamellen,
+      puiFactor: p.puiFactor,
+    },
+    dakraamKant: p.dakraamKant,
+    kopstaart: p.kopstaart, dwars: p.dwars, zwevend: p.zwevend,
+    veranda: p.veranda,
+    kopPui: p.kopPui,
+    hoekpuiKant: p.hoekpuiKant,
+    elementen: p.elementen || [],
+    naam: p.naam || t.naam,
+    beschrijving: p.beschrijving || '',
+    zinnen: [],
+  }
   return spec
 }
 

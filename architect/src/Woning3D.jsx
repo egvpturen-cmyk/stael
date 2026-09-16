@@ -43,10 +43,13 @@ function Volume({ b, d, goot, nok, nokOffset = 0, kleur, plat }) {
 
 // dakplaten die de (eventueel asymmetrische) kap volgen; veranda trekt
 // het dakvlak aan de kopzijde door op stalen kolommen
+// veranda: 0 of {diepte, kolommen} (aantal kolommen per gootzijde)
 function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, veranda = 0 }) {
+  const vDiepte = veranda ? (veranda.diepte ?? veranda) : 0
+  const vKolommen = veranda ? (veranda.kolommen ?? 2) : 2
   const mat = useMemo(() => dakMatVan(kleur), [kleur])
-  const diepte = d + 2 * overstek + veranda
-  const zMid = veranda / 2
+  const diepte = d + 2 * overstek + vDiepte
+  const zMid = vDiepte / 2
   if (plat) {
     return (
       <mesh material={mat} position={[0, goot + .11, zMid]}>
@@ -72,14 +75,19 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
           </mesh>
         )
       })}
-      {veranda > 0 && [-1, 1].map(k => (
-        <mesh key={k} material={MAT.staal} position={[k * (b / 2 - .25), goot / 2, d / 2 + veranda - .5]}>
-          <cylinderGeometry args={[.06, .06, goot, 10]} />
-        </mesh>
-      ))}
-      {veranda > 0 && (
-        <mesh material={MAT.terras} position={[0, .02, d / 2 + veranda / 2 - .2]}>
-          <boxGeometry args={[b - .4, .05, veranda + .6]} />
+      {vDiepte > 0 && [-1, 1].map(kant =>
+        Array.from({ length: vKolommen }, (_, i) => {
+          const z = vKolommen === 1 ? d / 2 + vDiepte - .5
+            : d / 2 + .3 + (vDiepte - .8) * (i / (vKolommen - 1))
+          return (
+            <mesh key={kant + ':' + i} material={MAT.staal} position={[kant * (b / 2 - .25), goot / 2, z]}>
+              <cylinderGeometry args={[.06, .06, goot, 10]} />
+            </mesh>
+          )
+        }))}
+      {vDiepte > 0 && (
+        <mesh material={MAT.terras} position={[0, .02, d / 2 + vDiepte / 2 - .2]}>
+          <boxGeometry args={[b - .4, .05, vDiepte + .6]} />
         </mesh>
       )}
     </group>
@@ -88,8 +96,8 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
 
 // glazen kopgevel die de daklijn volgt, met stramienstijl, kader,
 // lamellen en balkon als opties
-function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', kader, lamellen, balkon, ry = 0, xc = 0 }) {
-  const gB = b * (stramien === 'vlak' ? .7 : .62)
+function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', kader, kaderKleur, lamellen, balkon, puiFactor = 0, ry = 0, xc = 0 }) {
+  const gB = b * (puiFactor || (stramien === 'vlak' ? .7 : .62))
   const marge = .3
   const geo = useMemo(() => {
     const s = new THREE.Shape()
@@ -131,16 +139,41 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     )
   }
   if (kader) {
-    const kH = randYOp(0, b, goot, nok, nokOffset, marge - .1)
-    delen.push(
-      <group key="kader">
-        {[-1, 1].map(k => (
-          <mesh key={k} material={MAT.houtAccent} position={[k * (gB / 2 + .15), kH / 2, .06]}>
-            <boxGeometry args={[.3, kH, .5]} />
+    // het kader volgt de daklijn: schuine balken langs de dakranden,
+    // verticale stijlen tot aan de dakrand
+    const kMat = kaderKleur ? stdMat(kaderKleur) : MAT.houtAccent
+    const kDelen = []
+    for (const kant of [-1, 1]) {
+      const x = kant * (gB / 2 + .12)
+      const h = randYOp(kant * gB / 2, b, goot, nok, nokOffset, .02)
+      kDelen.push(
+        <mesh key={'v' + kant} material={kMat} position={[x, h / 2, .1]}>
+          <boxGeometry args={[.28, h, .5]} />
+        </mesh>
+      )
+    }
+    const top = [[-gB / 2 - .12, nokOffset], [nokOffset, gB / 2 + .12]]
+    if (!plat && nok > goot) {
+      top.forEach(([x1, x2], i) => {
+        const y1 = randYOp(Math.max(-b / 2, Math.min(b / 2, x1)), b, goot, nok, nokOffset, .02)
+        const y2 = randYOp(Math.max(-b / 2, Math.min(b / 2, x2)), b, goot, nok, nokOffset, .02)
+        const len = Math.hypot(x2 - x1, y2 - y1) + .3
+        kDelen.push(
+          <mesh key={'s' + i} material={kMat}
+            position={[(x1 + x2) / 2, (y1 + y2) / 2 + .1, .1]}
+            rotation={[0, 0, Math.atan2(y2 - y1, x2 - x1)]}>
+            <boxGeometry args={[len, .26, .5]} />
           </mesh>
-        ))}
-      </group>
-    )
+        )
+      })
+    } else {
+      kDelen.push(
+        <mesh key="boven" material={kMat} position={[0, randYOp(0, b, goot, nok, nokOffset, .02), .1]}>
+          <boxGeometry args={[gB + .5, .26, .5]} />
+        </mesh>
+      )
+    }
+    delen.push(<group key="kader">{kDelen}</group>)
   }
   if (lamellen && nok > goot) {
     const lams = []
@@ -175,15 +208,48 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
   )
 }
 
-// vensterritme op de langsgevels
+// dichte kopgevel met kader langs de daklijn, twee staande ramen,
+// een verdiepingsraam en een deur (voor volumes zonder grote pui)
+function KopGevelDicht({ b, goot, nok, nokOffset = 0, z, kaderKleur }) {
+  const kMat = kaderKleur ? stdMat(kaderKleur) : MAT.houtAccent
+  const delen = []
+  for (const kant of [-1, 1]) {
+    const x = kant * (b / 2 - .35)
+    const h = randYOp(x, b, goot, nok, nokOffset, .04)
+    delen.push(
+      <mesh key={'k' + kant} material={kMat} position={[x, h / 2, .06]}>
+        <boxGeometry args={[.55, h, .18]} />
+      </mesh>
+    )
+  }
+  const raam = (x, y, w, h, key) => (
+    <group key={key} position={[x, y, .05]}>
+      <mesh material={MAT.glas}><planeGeometry args={[w, h]} /></mesh>
+      <mesh material={MAT.kozijn} position={[0, 0, -.015]}>
+        <boxGeometry args={[w + .14, h + .14, .03]} />
+      </mesh>
+    </group>
+  )
+  delen.push(raam(-b / 4, 1.5, .95, 2.0, 'r1'))
+  delen.push(raam(b / 6, 1.5, .95, 2.0, 'r2'))
+  delen.push(raam(0, goot + (nok - goot) * .45, .9, 1.3, 'r3'))
+  delen.push(
+    <group key="deur" position={[b / 2 - 1.5, 1.15, .05]}>
+      <mesh material={MAT.kozijn}><boxGeometry args={[1.0, 2.3, .08]} /></mesh>
+    </group>
+  )
+  return <group position={[0, 0, z]}>{delen}</group>
+}
+
+// vensterritme op de langsgevels: raamstroken van plint tot goot
 function LangsGevels({ spec, b, d, goot }) {
   const ramen = []
   const n = spec.stramienN
   for (const kant of [-1, 1]) {
     for (let i = 0; i < n; i++) {
       const z = -d / 2 + d * ((i + .5) / n)
-      const h = spec.lagen === 2 && spec.typologie.id === 'loft' ? goot - 1.1 : Math.min(goot - .55, 2.1)
-      const y = h / 2 + .45
+      const h = goot - .65
+      const y = h / 2 + .3
       ramen.push(
         <group key={kant + ':' + i} position={[kant * (b / 2 + .04), y, z]} rotation={[0, kant * Math.PI / 2, 0]}>
           <mesh material={MAT.glas}><planeGeometry args={[1.0, h]} /></mesh>
@@ -199,17 +265,19 @@ function LangsGevels({ spec, b, d, goot }) {
 
 // ---------- massastrategieen ----------
 
+const verandaVan = spec => spec.veranda || (spec.elementen.includes('veranda') ? { diepte: 2.4, kolommen: 2 } : 0)
+
 function MassaEnkel({ spec }) {
   const { b, d, goot, nok, plat } = spec
   const off = spec.nokOffset || 0
-  const veranda = spec.elementen.includes('veranda') ? 2.4 : 0
   return (
     <group>
       <Volume b={b} d={d} goot={goot} nok={nok} nokOffset={off} kleur={spec.gevel} plat={plat} />
       <Dakplaten b={b} d={d} goot={goot} nok={nok} nokOffset={off} overstek={spec.overstek}
-        kleur={spec.dak} plat={plat} veranda={veranda} />
+        kleur={spec.dak} plat={plat} veranda={verandaVan(spec)} />
       <KopGevel b={b} goot={goot} nok={nok} nokOffset={off} plat={plat} z={d / 2 + .04}
-        stramien={spec.kop.stramien} kader={spec.kop.kader} lamellen={spec.kop.lamellen}
+        stramien={spec.kop.stramien} kader={spec.kop.kader} kaderKleur={spec.kop.kaderKleur}
+        lamellen={spec.kop.lamellen} puiFactor={spec.kop.puiFactor}
         balkon={spec.elementen.includes('balkon')} />
       <LangsGevels spec={spec} b={b} d={d} goot={goot} />
       {spec.typologie.id === 'paviljoen' && [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([kx, kz]) => (
@@ -236,9 +304,10 @@ function MassaKopstaart({ spec }) {
       <group position={[0, 0, (d - ks.dKop) / 2]}>
         <Volume b={b} d={ks.dKop} goot={ks.gootK} nok={ks.nokK} kleur={spec.gevel} />
         <Dakplaten b={b} d={ks.dKop} goot={ks.gootK} nok={ks.nokK} overstek={spec.overstek} kleur={spec.dak}
-          veranda={spec.elementen.includes('veranda') ? 2.2 : 0} />
+          veranda={verandaVan(spec)} />
         <KopGevel b={b} goot={ks.gootK} nok={ks.nokK} z={ks.dKop / 2 + .04}
-          stramien={spec.kop.stramien} kader={spec.kop.kader} lamellen={spec.kop.lamellen}
+          stramien={spec.kop.stramien} kader={spec.kop.kader} kaderKleur={spec.kop.kaderKleur}
+          lamellen={spec.kop.lamellen} puiFactor={spec.kop.puiFactor}
           balkon={spec.elementen.includes('balkon')} />
       </group>
       {/* langgerekte lagere staart */}
@@ -259,13 +328,18 @@ function MassaDwarskap({ spec }) {
     <group>
       <Volume b={b} d={d} goot={goot} nok={nok} kleur={spec.gevel} />
       <Dakplaten b={b} d={d} goot={goot} nok={nok} overstek={spec.overstek} kleur={spec.dak}
-        veranda={spec.elementen.includes('veranda') ? 2.2 : 0} />
-      <KopGevel b={b} goot={goot} nok={nok} z={d / 2 + .04}
-        stramien={spec.kop.stramien} kader={spec.kop.kader} lamellen={spec.kop.lamellen}
-        balkon={spec.elementen.includes('balkon')} />
+        veranda={verandaVan(spec)} />
+      {spec.kopPui !== false ? (
+        <KopGevel b={b} goot={goot} nok={nok} z={d / 2 + .04}
+          stramien={spec.kop.stramien} kader={spec.kop.kader} kaderKleur={spec.kop.kaderKleur}
+          lamellen={spec.kop.lamellen} puiFactor={spec.kop.puiFactor}
+          balkon={spec.elementen.includes('balkon')} />
+      ) : (
+        <KopGevelDicht b={b} goot={goot} nok={nok} z={d / 2 + .04} kaderKleur={spec.kop.kaderKleur} />
+      )}
       <LangsGevels spec={spec} b={b} d={d} goot={goot} />
       {/* haaks dwarsvolume met eigen glazen kopgevel op de flank */}
-      <group position={[groepX, 0, dw.z]} rotation={[0, -Math.PI / 2, 0]}>
+      <group position={[groepX, 0, dw.z]} rotation={[0, Math.PI / 2, 0]}>
         <Volume b={dw.b2} d={dw.d2} goot={dw.goot2} nok={dw.nok2} kleur={spec.gevel2 || spec.gevel} />
         <Dakplaten b={dw.b2} d={dw.d2} goot={dw.goot2} nok={dw.nok2} overstek={spec.overstek * .8} kleur={spec.dak} />
         <KopGevel b={dw.b2} goot={dw.goot2} nok={dw.nok2} z={dw.d2 / 2 + .04} stramien={spec.kop.stramien} />
@@ -353,18 +427,29 @@ function Elementen({ spec }) {
     )
   }
   if (el('hoekpui') && spec.massa !== 'zwevend') {
-    const hp = Math.min(goot - .4, 2.8)
+    // uitstekende glazen erker op de hoek van de kopgevel
+    const kant = spec.hoekpuiKant || 1
+    const hp = Math.min(goot - .4, 2.7)
+    const eB = 2.9, eD = .85
+    const xc = kant * (b / 2 - eB / 2 + .2)
     delen.push(
-      <group key="hoekpui">
-        <mesh material={MAT.glas} position={[b / 2 - 1.5, hp / 2 + .05, d / 2 + .05]}>
-          <planeGeometry args={[2.8, hp]} />
+      <group key="hoekpui" position={[xc, 0, d / 2]}>
+        <mesh material={MAT.glas} position={[0, hp / 2 + .05, eD]}>
+          <planeGeometry args={[eB, hp]} />
         </mesh>
-        <group position={[b / 2 + .05, hp / 2 + .05, d / 2 - 1.5]} rotation={[0, Math.PI / 2, 0]}>
-          <mesh material={MAT.glas}><planeGeometry args={[2.8, hp]} /></mesh>
-        </group>
-        <mesh material={MAT.kozijn} position={[b / 2 + .03, hp / 2 + .05, d / 2 + .03]}>
-          <boxGeometry args={[.1, hp, .1]} />
+        {[-1, 1].map(k => (
+          <group key={k} position={[k * eB / 2, hp / 2 + .05, eD / 2]} rotation={[0, k * Math.PI / 2, 0]}>
+            <mesh material={MAT.glas}><planeGeometry args={[eD, hp]} /></mesh>
+          </group>
+        ))}
+        <mesh material={MAT.staal} position={[0, hp + .12, eD / 2]}>
+          <boxGeometry args={[eB + .15, .14, eD + .15]} />
         </mesh>
+        {[[-eB / 2, eD], [eB / 2, eD]].map(([x, z], i) => (
+          <mesh key={i} material={MAT.kozijn} position={[x, hp / 2 + .05, z]}>
+            <boxGeometry args={[.09, hp, .09]} />
+          </mesh>
+        ))}
       </group>
     )
   }
@@ -380,15 +465,17 @@ function Elementen({ spec }) {
     )
   }
   if (el('dakramen') && !spec.plat) {
+    const kant = spec.dakraamKant || 1
     const off = spec.nokOffset || 0
-    const hoekR = Math.atan2(nok - goot, b / 2 - off)
-    const x = (off + b / 2) / 2
+    const xRand = kant * b / 2
+    const hoek = Math.atan2(nok - goot, Math.abs(xRand - off))
+    const x = (off + xRand) / 2
     const y = randYOp(x, b, goot, nok, off, 0) + .12
     for (let i = 0; i < 2; i++) {
       delen.push(
         <mesh key={'dakraam' + i} material={MAT.glas}
           position={[x, y, -d / 4 + i * (d / 2.2)]}
-          rotation={[0, 0, -hoekR]}>
+          rotation={[0, 0, -kant * hoek]}>
           <boxGeometry args={[1.1, .06, .9]} />
         </mesh>
       )
@@ -479,13 +566,18 @@ export function Woning({ spec, programma }) {
   )
 }
 
-export default function Woning3D({ spec, programma, groot = false }) {
-  const afstand = Math.max(spec.b, spec.d) * (groot ? 1.7 : 2.0) + 7
+export default function Woning3D({ spec, programma, groot = false, camera = null }) {
+  const afstand = camera?.afstand ?? Math.max(spec.b, spec.d) * (groot ? 1.7 : 2.0) + 7
+  // camera-override voor de kalibratiepagina: azimut in graden vanaf de kopgevel
+  const az = camera ? camera.azimut * Math.PI / 180 : null
+  const pos = camera
+    ? [afstand * Math.sin(az), camera.hoogte ?? afstand * .35, afstand * Math.cos(az)]
+    : [afstand * .78, afstand * .4, afstand * .62]
   return (
     <Canvas
       dpr={[1, 1.75]}
       shadows={false}
-      camera={{ position: [afstand * .78, afstand * .4, afstand * .62], fov: 38 }}
+      camera={{ position: pos, fov: camera?.fov ?? 38 }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}>
       <color attach="background" args={['#1a1a1d']} />
       <fog attach="fog" args={['#1a1a1d', afstand * 1.6, afstand * 3.6]} />
@@ -496,7 +588,7 @@ export default function Woning3D({ spec, programma, groot = false }) {
       <Woning spec={spec} programma={programma} />
       <ContactShadows position={[0, .005, 0]} opacity={.55} scale={Math.max(spec.b, spec.d) * 2.4} blur={2.6} far={12} resolution={512} />
       <OrbitControls
-        target={[0, spec.nok / 2.4, 0]}
+        target={[0, camera?.doelY ?? spec.nok / 2.4, 0]}
         enablePan={false}
         minDistance={afstand * .45}
         maxDistance={afstand * 1.7}

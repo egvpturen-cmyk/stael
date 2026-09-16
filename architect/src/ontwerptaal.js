@@ -23,7 +23,8 @@ export const REGELS_DEFAULT = {
 // Materiaalstemming per typologie (fase 1: kleurvlakken, fase 2: echte texturen)
 export const KLEUREN = {
   houtWarm: '#77644c', houtGrijs: '#6d6355', houtZwart: '#31302c',
-  houtLicht: '#8a7a5e', staalZwart: '#26262a', stucLicht: '#b9b2a4',
+  houtLicht: '#8a7a5e', houtBlank: '#b09a72', staalZwart: '#26262a',
+  stucLicht: '#b9b2a4', wit: '#d8d4c9',
   felsAntraciet: '#232327', felsBlauwgrijs: '#3f4750', zink: '#4c4f54',
   koper: '#8a5637', baksteen: '#5f4c40',
 }
