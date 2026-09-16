@@ -1,10 +1,11 @@
 # STÆL — Architectural Steel Homes
 
-Woningmerk (handelsnaam) van EG Assembly B.V., Naaldwijk. Aannemer en bouwer van stalen woningen / loftwoningen. Dit document is de brief voor Claude Code: merkregels, huidige status, en de specificatie van Live Architect.
+Woningmerk van de samenwerking tussen EG Assembly B.V. (Naaldwijk) en New Way. Aannemer en bouwer van stalen woningen / loftwoningen. Dit document is de brief voor Claude Code: merkregels, huidige status, en de specificatie van Live Architect.
 
 ## 1. Merk
 
 - Naam: STÆL (in tekst en e-mail: STAEL). Tagline: "Architectural Steel Homes".
+- Achter het merk: STÆL is een samenwerking tussen EG Assembly B.V. en New Way.
 - Logo: huisje van staalprofielen + wordmark met ineengrijpende Æ. De Æ is het onderscheidende element.
 - Assets: `assets/logo.png` (wit + koperen Æ, voor donkere achtergrond), `assets/wordmark.png` (alleen STÆL).
 - Kleuren:
@@ -64,6 +65,6 @@ Doel: samen met de klant live een woning ontwerpen. De huidige demo in index.htm
 
 ## 4. Contact / gegevens
 
-- Bedrijf: EG Assembly B.V., Naaldwijk (Westland). Bouwers sinds 1992.
+- Samenwerking: EG Assembly B.V. x New Way. EG Assembly: Naaldwijk (Westland), bouwers sinds 1992.
 - E-mail placeholder op de site: info@stael.nl (domein nog registreren).
-- STÆL wordt gevoerd als handelsnaam onder EG Assembly B.V.
+- STÆL wordt gevoerd als samenwerking tussen EG Assembly B.V. en New Way.
