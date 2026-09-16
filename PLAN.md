@@ -32,7 +32,7 @@ Eén statische pagina, alles vanilla HTML/CSS/JS, Three.js r128 via cdnjs voor d
 - Contactformulier is nep (toont alleen bevestiging): koppelen aan e-mail/formulierdienst.
 - Conceptbeelden en teamfoto's zijn AI-gegenereerd: vervangen door echte projectfoto's zodra het eerste STÆL-project er is. Op sommige beelden staan AI-tekstfouten (shirts, naambordjes).
 - Logo bestaat alleen als PNG: vectorversie (SVG/AI) laten maken; master zwart-wit + variant met koperen Æ (#C98A5E vastleggen als merkkleur).
-- Domein stael.nl registreren, merkcheck BOIP klasse 6 en 37.
+- Domein registreren: stael.nl is bezet, het wordt waarschijnlijk staelhome.nl. Merkcheck BOIP klasse 6 en 37.
 - SEO/meta/OG-tags, favicon-bestand, analytics.
 
 ## 3. Live Architect — productspecificatie
@@ -66,5 +66,5 @@ Doel: samen met de klant live een woning ontwerpen. De huidige demo in index.htm
 ## 4. Contact / gegevens
 
 - Samenwerking: EG Assembly B.V. x New Way. EG Assembly: Naaldwijk (Westland), bouwers sinds 1992.
-- E-mail placeholder op de site: info@stael.nl (domein nog registreren).
+- E-mail placeholder op de site: info@staelhome.nl (domein nog registreren).
 - STÆL wordt gevoerd als samenwerking tussen EG Assembly B.V. en New Way.
