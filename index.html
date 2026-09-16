@@ -86,6 +86,8 @@ header{position:relative}
   -webkit-mask-position:center 44%;mask-position:center 44%;
   -webkit-mask-size:min(64vw,540px) auto;mask-size:min(64vw,540px) auto}
 .zoom-foto{position:absolute;inset:0;background:url(assets/huis2.jpg) center/cover;will-change:transform}
+.zoom-vlak{position:absolute;inset:0;background:url(assets/huis2.jpg) center/cover;
+  filter:brightness(.55);opacity:0;pointer-events:none}
 .zoom-doek{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
   background:radial-gradient(ellipse 90% 70% at 50% 45%,rgba(19,19,21,.25) 0%,rgba(19,19,21,.82) 78%,var(--zwart) 100%)}
 .zoom-hint{position:absolute;bottom:2.4rem;left:50%;transform:translateX(-50%);z-index:5;
@@ -378,6 +380,7 @@ footer p{font-size:.8rem;color:var(--grijs)}
   .zoomhero{height:100svh}
   .zoom-wrap{-webkit-mask-image:none;mask-image:none}
   .zoom-foto{filter:brightness(.5)}
+  .zoom-vlak{opacity:1}
   .zoom-doek{opacity:1}
   .zoom-einde{opacity:1;pointer-events:auto}
   .zoom-hint{display:none}
@@ -414,6 +417,7 @@ footer p{font-size:.8rem;color:var(--grijs)}
       <div class="zoom-wrap" id="zoom-wrap">
         <div class="zoom-foto" id="zoom-foto"></div>
       </div>
+      <div class="zoom-vlak" id="zoom-vlak"></div>
       <div class="zoom-doek" id="zoom-doek"></div>
       <p class="zoom-hint" id="zoom-hint">Architectural Steel Homes</p>
       <div class="zoom-einde" id="zoom-einde">
@@ -744,9 +748,11 @@ const zoomFoto=document.getElementById('zoom-foto');
 const zoomHint=document.getElementById('zoom-hint');
 const zoomEinde=document.getElementById('zoom-einde');
 const zoomDoek=document.getElementById('zoom-doek');
+const zoomVlak=document.getElementById('zoom-vlak');
 function zoomOrigin(){
   const maskW=Math.min(.64*innerWidth,540);
-  const links=(innerWidth-maskW)/2, boven=innerHeight*.44-maskW/2;
+  // mask-position werkt als background-position: 44% van het maskervak op 44% van de container
+  const links=.5*(innerWidth-maskW), boven=.44*(innerHeight-maskW);
   const ox=links+.57*maskW, oy=boven+.66*maskW;
   zoomWrap.style.transformOrigin=ox+'px '+oy+'px';
   zoomFoto.style.transformOrigin=ox+'px '+oy+'px';
@@ -756,18 +762,22 @@ addEventListener('resize',zoomOrigin);
 function zoomIntro(){
   if(!beweegOK){zoomEinde.classList.add('zichtbaar');zoomHint.style.opacity=0;return;}
   const wacht=1500, duur=2800, t0=performance.now();
+  // begrens de eindschaal: op mobiel wordt de gemaskeerde laag anders groter dan de GPU-limiet
+  const maxS=Math.min(Math.max(14000/(Math.max(innerWidth,innerHeight)*Math.min(devicePixelRatio||1,3)),8),42);
   function frame(t){
     const ruw=(t-t0-wacht)/duur;
     const p=Math.min(Math.max(ruw,0),1);
     const e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2; // easeInOutCubic
-    const s=1+Math.pow(e,1.45)*42;
+    const s=1+Math.pow(e,1.45)*maxS;
     zoomWrap.style.transform='scale('+s+')';
     zoomFoto.style.transform='scale('+(1/s)+')';
     zoomHint.style.opacity=e<.04?1:0;
     zoomDoek.style.opacity=e>.62?Math.min((e-.62)/.3,1):0;
+    zoomVlak.style.opacity=e>.7?Math.min((e-.7)/.28,1):0;
     if(e>.82)zoomEinde.classList.add('zichtbaar');
     document.getElementById('vonken').style.opacity=Math.max(1-e*2.2,0);
     if(p<1)requestAnimationFrame(frame);
+    else zoomWrap.style.visibility='hidden';
   }
   requestAnimationFrame(frame);
 }
