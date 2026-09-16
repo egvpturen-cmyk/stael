@@ -230,11 +230,12 @@ section{padding:clamp(4.5rem,9vw,7.5rem) clamp(1.2rem,4vw,3rem)}
 #bouw{padding:0}
 .hscroll{height:340vh;position:relative}
 .hscroll-plak{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;flex-direction:column;justify-content:center;
-  padding-top:clamp(4.5rem,9vw,7.5rem)}
+  padding-top:clamp(4.5rem,9vw,7.5rem);padding-bottom:clamp(4.5rem,9vw,7.5rem)}
 .hscroll-kop{padding:0 clamp(1.2rem,4vw,3rem);max-width:var(--maat);margin:0 auto 2.4rem;width:100%}
 .hscroll-baan{display:flex;gap:clamp(1rem,2.5vw,2rem);padding:0 clamp(1.2rem,4vw,3rem);will-change:transform}
 .hpaneel{flex:0 0 auto;width:min(68vw,760px);position:relative;overflow:hidden}
-.hpaneel img{width:100%;aspect-ratio:4/3;object-fit:cover;filter:saturate(.92)}
+.hpaneel img{width:100%;aspect-ratio:4/3;object-fit:cover;filter:saturate(.92);
+  max-height:calc(100vh - clamp(9rem,18vw,15rem) - 12rem)}
 .hpaneel figcaption{position:absolute;left:0;right:0;bottom:0;padding:2rem 1.4rem 1.1rem;
   background:linear-gradient(to top,rgba(19,19,21,.88),transparent);
   font-size:.9rem;letter-spacing:.08em}
