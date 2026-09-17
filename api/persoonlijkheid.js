@@ -35,6 +35,22 @@ materialen en elementen, en het letterlijke citaat van de klant. Vat
 aan het einde het smaakprofiel in twee zinnen samen, vraag of het
 klopt, en rond dan af met stapAfronden en naarStap naar stap 2.
 Afronden kan alleen met 3 tot 5 favorieten.
+
+In stap 2 (kavel en programma): vraag eerst het adres van de kavel en
+zoek het op met kavelZoeken; de luchtfoto met de kadastrale
+perceelgrenzen verschijnt dan vanzelf in beeld. Vraag de klant het
+eigen perceel op de kaart aan te wijzen; noemt de klant een
+perceelnummer, leg de keuze dan vast met kavelKiezen. De oppervlakte
+komt altijd uit de kadastrale gegevens; verzin er nooit een. Bespreek
+daarna het programma van eisen, EEN vraag tegelijk: gewenste
+woonoppervlakte, aantal verdiepingen, slaapkamers, badkamers, het
+soort keuken en bijzondere wensen. Vertel dat het
+bebouwingspercentage en het bouwvlak uit het bestemmingsplan van de
+gemeente volgen en noteer wat de klant daarover al weet als
+bijzonderheid. Leg elk antwoord direct vast met programmaVastleggen.
+Vat samen, vraag of het klopt, en rond dan af met stapAfronden en
+naarStap naar stap 3. Afronden kan alleen met een gekozen perceel en
+een vastgelegd programma.
 `.trim()
 
 // functiedeclaraties in het formaat dat zowel Realtime als chat
@@ -82,6 +98,39 @@ export const FUNCTIES = [
         aan: { type: 'boolean' },
       },
       required: ['nummer', 'aan'],
+    },
+  },
+  {
+    name: 'kavelZoeken',
+    description: 'Zoek het adres van de kavel op; de kaart met luchtfoto en perceelgrenzen verschijnt vanzelf.',
+    parameters: {
+      type: 'object',
+      properties: { adres: { type: 'string', description: 'adres zoals de klant het noemt, bijv. straat, huisnummer en plaats' } },
+      required: ['adres'],
+    },
+  },
+  {
+    name: 'kavelKiezen',
+    description: 'Leg het gekozen kadastrale perceel vast; alleen mogelijk na kavelZoeken.',
+    parameters: {
+      type: 'object',
+      properties: { perceelId: { type: 'string', description: 'id van het perceel uit het resultaat van kavelZoeken' } },
+      required: ['perceelId'],
+    },
+  },
+  {
+    name: 'programmaVastleggen',
+    description: 'Leg (een deel van) het programma van eisen vast; velden mogen in losse aanroepen komen.',
+    parameters: {
+      type: 'object',
+      properties: {
+        woonoppervlakte: { type: 'number', description: 'gewenste woonoppervlakte in m2' },
+        verdiepingen: { type: 'integer', description: 'aantal verdiepingen' },
+        slaapkamers: { type: 'integer' },
+        badkamers: { type: 'integer' },
+        keuken: { type: 'string', description: 'soort keuken, bijv. leefkeuken of gesloten keuken' },
+        bijzonderheden: { type: 'string', description: 'bijzondere wensen of wat de klant over het bestemmingsplan weet' },
+      },
     },
   },
   {

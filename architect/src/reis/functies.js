@@ -5,6 +5,7 @@
 // gesprekstest hem in node kan draaien.
 import { sessiePatch } from './api.js'
 import { COLLECTIE } from './collectie.js'
+import { zoekAdres, adresDetail, percelenRond } from './pdok.js'
 
 export function maakFuncties({ token, sessieRef, opUiSignaal }) {
   const sessie = () => sessieRef.huidige
@@ -14,6 +15,10 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
     return nieuw
   }
   const signaal = (naam, data) => { if (opUiSignaal) opUiSignaal(naam, data) }
+
+  // het laatst gezochte adres met omliggende percelen; de bron waaruit
+  // kavelKiezen put, zowel bij een kaartklik als bij een gesproken keuze
+  let kavelBron = { adres: null, percelen: [] }
 
   const uitvoerders = {
     async spraakVoorkeur({ spraak }) {
@@ -53,6 +58,50 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
       return { ok: true, favorieten: smaak.favorieten }
     },
 
+    async kavelZoeken({ adres }) {
+      if (!adres || !adres.trim()) return { ok: false, fout: 'geen adres opgegeven' }
+      const suggesties = await zoekAdres(adres.trim())
+      if (!suggesties.length) return { ok: false, fout: 'geen adres gevonden voor "' + adres.trim() + '"' }
+      const detail = await adresDetail(suggesties[0].id)
+      const { percelen } = await percelenRond(detail.lon, detail.lat)
+      kavelBron = { adres: detail, percelen }
+      signaal('kavelBron', kavelBron)
+      return {
+        ok: true, adres: detail.weergavenaam,
+        percelen: percelen.map(p => ({ id: p.id, sectie: p.sectie, perceelnummer: p.perceelnummer, oppervlakte: p.oppervlakte })),
+      }
+    },
+
+    async kavelKiezen({ perceelId }) {
+      const p = kavelBron.percelen.find(x => x.id === String(perceelId))
+      if (!p) return { ok: false, fout: 'onbekend perceel; zoek eerst het adres en wijs het perceel op de kaart aan' }
+      const kavel = {
+        adres: kavelBron.adres?.weergavenaam ?? null,
+        lon: kavelBron.adres?.lon ?? null,
+        lat: kavelBron.adres?.lat ?? null,
+        perceelId: p.id, sectie: p.sectie, perceelnummer: p.perceelnummer,
+        gemeente: p.gemeente, oppervlakte: p.oppervlakte, geometrie: p.geometrie,
+      }
+      await zet({ kavel })
+      signaal('kavel', kavel)
+      // de geometrie blijft in de sessie maar hoort niet in het gesprek
+      const { geometrie, ...voorGesprek } = kavel
+      return { ok: true, kavel: voorGesprek }
+    },
+
+    async programmaVastleggen(args) {
+      const velden = ['woonoppervlakte', 'verdiepingen', 'slaapkamers', 'badkamers', 'keuken', 'bijzonderheden']
+      const updates = {}
+      for (const v of velden) {
+        if (args[v] !== undefined && args[v] !== null && args[v] !== '') updates[v] = args[v]
+      }
+      if (!Object.keys(updates).length) return { ok: false, fout: 'geen programmagegevens meegegeven' }
+      const programma = { ...(sessie().programma || {}), ...updates }
+      await zet({ programma })
+      signaal('programma', programma)
+      return { ok: true, programma }
+    },
+
     async stapAfronden({ stap }) {
       if (stap !== sessie().stap) return { ok: false, fout: 'dit is niet de huidige stap' }
       if (stap === 1) {
@@ -70,6 +119,14 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
         }
         await zet({ smaak })
         signaal('smaak', smaak)
+      }
+      if (stap === 2) {
+        const kavel = sessie().kavel
+        if (!kavel || !kavel.perceelId) return { ok: false, fout: 'kies eerst het perceel op de kaart' }
+        const programma = sessie().programma
+        if (!programma || !programma.woonoppervlakte || !programma.slaapkamers) {
+          return { ok: false, fout: 'leg eerst het programma vast (minstens woonoppervlakte en slaapkamers)' }
+        }
       }
       signaal('stapAfgerond', { stap })
       return { ok: true, stap }

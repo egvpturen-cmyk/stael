@@ -3,6 +3,8 @@ import { sessieMaak, sessieLees } from './api.js'
 import { maakFuncties } from './functies.js'
 import { maakTekstAdapter, maakRealtimeAdapter } from './adapter.js'
 import { COLLECTIE } from './collectie.js'
+import { zetPdokFixture } from './pdok.js'
+import KavelStap from './KavelStap.jsx'
 
 // De klantreis (/reis): een begeleide reis in stappen met de pratende
 // Architect als gastheer. Stem en tekst zijn hetzelfde gesprek via twee
@@ -133,6 +135,7 @@ export default function Reis() {
   const [invoer, zetInvoer] = useState('')
   const [status, zetStatus] = useState('tekst')
   const [melding, zetMelding] = useState(null)
+  const [kavelBron, zetKavelBron] = useState(null)
   const sessieRef = useRef({ huidige: null })
   const adapterRef = useRef(null)
   const functiesRef = useRef(null)
@@ -156,6 +159,7 @@ export default function Reis() {
     (async () => {
       const url = new URL(location.href)
       const bestaand = url.searchParams.get('s')
+      if (url.searchParams.get('fixture') === '1') zetPdokFixture(true)
       try {
         let t = bestaand, s = null
         if (bestaand) {
@@ -171,7 +175,10 @@ export default function Reis() {
         zetToken(t); zetSessie(s)
         functiesRef.current = maakFuncties({
           token: t, sessieRef: { get huidige() { return sessieRef.current.huidige }, set huidige(v) { sessieRef.current.huidige = v; zetSessie(v) } },
-          opUiSignaal: () => zetSessie({ ...sessieRef.current.huidige }),
+          opUiSignaal: (naam, data) => {
+            if (naam === 'kavelBron') zetKavelBron(data)
+            zetSessie({ ...sessieRef.current.huidige })
+          },
         })
         toonBericht('architect', s.stap === 0
           ? 'Welkom bij STAEL. Ik ben de Architect en ik neem u in vier stappen mee naar uw woning: eerst uw smaak, dan uw kavel en programma, dan de modellen, en tot slot de beelden. Vindt u het prettig om te praten, of typt u liever?'
@@ -290,7 +297,12 @@ export default function Reis() {
           <CollectieStap sessie={sessie} functies={functiesRef.current} meldArchitect={t => toonBericht('architect', t)} />
         )}
 
-        {stap > 1 && (
+        {stap === 2 && sessie && (
+          <KavelStap sessie={sessie} functies={functiesRef.current} kavelBron={kavelBron}
+            meldArchitect={t => toonBericht('architect', t)} />
+        )}
+
+        {stap > 2 && (
           <div style={{ ...vak, padding: '.8rem', color: '#a7a49c', fontSize: '.88rem' }}>
             Stap {stap} ({STAPPEN[stap - 1]}) wordt in het volgende bouwdeel ingericht; het gesprek en uw sessie lopen gewoon door.
           </div>
