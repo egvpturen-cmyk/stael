@@ -9,6 +9,8 @@
 // Kopgevels liggen op z = +d/2 (kop+) en z = -d/2 (kop-).
 // Wandcoordinaten zijn lokaal (u langs de gevel, v = hoogte).
 
+import { STAELDETAILS } from './staeldetails.js'
+
 export const WAND_DIKTE = .28
 
 // deterministische pseudo-random voor latere stappen (nu ongebruikt,
@@ -59,22 +61,37 @@ function puiContour(vol, cx, breedte, marge, plint = .12) {
 export function bouwModel(p) {
   const v = p.volume
   const nok = v.nok ?? v.goot + Math.tan(v.helling * Math.PI / 180) * (v.b / 2 - Math.abs(v.nokOffset || 0))
+
+  // detailfamilie: strak/gootloos (default, zoals gebouwd) of een
+  // bewust kolossaal maar slank gedetailleerd overstek
+  const familie = p.rand?.familie === 'kolossaal' ? 'kolossaal' : 'strak'
+  const helling = Math.atan2(nok - v.goot, v.b / 2 - Math.abs(v.nokOffset || 0))
+  const cosH = Math.cos(helling)
+  const overstekHor = familie === 'kolossaal'
+    ? Math.min(STAELDETAILS.kolossaal.overstek[1],
+        Math.max(STAELDETAILS.kolossaal.overstek[0], p.rand?.overstek ?? 1.1))
+    : STAELDETAILS.strak.overstek
+
   const vol = {
     id: 'vol-1',
     b: v.b, d: v.d, goot: v.goot, nok,
     nokOffset: v.nokOffset || 0,
-    dakDikte: v.dakDikte ?? .16,
-    overstek: { goot: v.overstek?.goot ?? .45, kop: v.overstek?.kop ?? .35 },
+    dakDikte: v.dakDikte ?? STAELDETAILS.dak.dikte,
+    familie,
+    // maten langs het dakvlak en in z, afgeleid uit de familie
+    dakInzet: familie === 'strak' ? STAELDETAILS.strak.dakInzet / cosH : 0,
+    overstekLangs: overstekHor / cosH,
+    overstekKop: familie === 'kolossaal' ? overstekHor * STAELDETAILS.kolossaal.overstekKopFactor : 0,
   }
 
-  // dakvlakken: twee hellende vlakken met dikte en overstek als eigenschap
   const dakvlakken = [-1, 1].map(kant => {
     const gootU = kant * vol.b / 2
     return {
       id: 'dak' + (kant === -1 ? 'L' : 'R'), volumeId: vol.id, kant,
       goot2D: [gootU, vol.goot], nok2D: [vol.nokOffset, vol.nok],
       dikte: vol.dakDikte,
-      overstekGoot: vol.overstek.goot, overstekKop: vol.overstek.kop,
+      inzetLangs: vol.dakInzet,
+      overstekLangs: vol.overstekLangs, overstekKop: vol.overstekKop,
     }
   })
 
@@ -135,14 +152,26 @@ export function bouwModel(p) {
   }
 
   // randafwerking: automatisch langs alle dakranden, zodat elke rand
-  // per constructie gesloten is
-  const randafwerking = [
-    { type: 'nokvorst', volumeId: vol.id },
-    { type: 'goot', kant: 1, volumeId: vol.id },
-    { type: 'goot', kant: -1, volumeId: vol.id },
-    { type: 'windveer', richting: 1, volumeId: vol.id },
-    { type: 'windveer', richting: -1, volumeId: vol.id },
-  ]
+  // per constructie gesloten is; de invulling volgt de detailfamilie
+  const randafwerking = [{ type: 'nokvouw', volumeId: vol.id }]
+  if (familie === 'strak') {
+    // gevel en dakrand vormen een vlak: doorlopend boeideel, verholen goot
+    randafwerking.push(
+      { type: 'boeideel', kant: 1, volumeId: vol.id },
+      { type: 'boeideel', kant: -1, volumeId: vol.id },
+      { type: 'boeikop', richting: 1, volumeId: vol.id },
+      { type: 'boeikop', richting: -1, volumeId: vol.id },
+    )
+  } else {
+    randafwerking.push(
+      { type: 'randprofiel', kant: 1, volumeId: vol.id },
+      { type: 'randprofiel', kant: -1, volumeId: vol.id },
+      { type: 'windveer', richting: 1, volumeId: vol.id },
+      { type: 'windveer', richting: -1, volumeId: vol.id },
+      { type: 'gordingen', kant: 1, volumeId: vol.id },
+      { type: 'gordingen', kant: -1, volumeId: vol.id },
+    )
+  }
 
   return {
     seed: p.seed ?? 1,

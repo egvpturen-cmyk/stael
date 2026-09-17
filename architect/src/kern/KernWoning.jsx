@@ -115,22 +115,29 @@ function Wand({ wand, model }) {
   )
 }
 
-function Dakvlak({ vlak, model }) {
-  const vol = model.volumes[0]
-  const m = useMemo(() => mat(model.kleuren.dak, .6, .1), [model.kleuren.dak])
+// vlakmeetkunde van een dakvlak: richting nok->goot, normaal, lengte
+function vlakMaat(vlak) {
   const [gu, gv] = vlak.goot2D, [nu, nv] = vlak.nok2D
   const dx = gu - nu, dy = gv - nv
   const n0 = Math.hypot(dx, dy)
-  const len = n0 + vlak.overstekGoot
   const ux = dx / n0, uy = dy / n0
-  // normaal omhoog-buiten: onderzijde van de plaat ligt op de daklijn
   let nx = -uy, ny = ux
   if (ny < 0) { nx = -nx; ny = -ny }
+  return { nu, nv, ux, uy, nx, ny, n0, hoek: Math.atan2(dy, dx) }
+}
+
+function Dakvlak({ vlak, model }) {
+  const vol = model.volumes[0]
+  const m = useMemo(() => mat(model.kleuren.dak, .6, .1), [model.kleuren.dak])
+  const { nu, nv, ux, uy, nx, ny, n0, hoek } = vlakMaat(vlak)
+  // het vlak loopt van de nok tot inzet binnen de gevel (strak) of tot
+  // voorbij de gevel (kolossaal overstek)
+  const len = n0 - vlak.inzetLangs + vlak.overstekLangs
   const cx = nu + ux * (len / 2) + nx * (vlak.dikte / 2)
   const cy = nv + uy * (len / 2) + ny * (vlak.dikte / 2)
   const diepte = vol.d + 2 * vlak.overstekKop
   return (
-    <mesh material={m} position={[cx, cy, 0]} rotation={[0, 0, Math.atan2(dy, dx)]}>
+    <mesh material={m} position={[cx, cy, 0]} rotation={[0, 0, hoek]}>
       <boxGeometry args={[len, vlak.dikte, diepte]} />
     </mesh>
   )
@@ -138,53 +145,105 @@ function Dakvlak({ vlak, model }) {
 
 function Randafwerking({ rand, model }) {
   const vol = model.volumes[0]
+  const gevelM = useMemo(() => mat(model.kleuren.gevel), [model.kleuren.gevel])
   const kozijn = useMemo(() => mat(model.kleuren.kozijn, .5), [model.kleuren.kozijn])
   const dak = useMemo(() => mat(model.kleuren.dak, .55, .1), [model.kleuren.dak])
-  const diepte = vol.d + 2 * vol.overstek.kop
+  const staal = useMemo(() => mat('#26262a', .45, .3), [])
+  const diepte = vol.d + 2 * vol.overstekKop
 
-  if (rand.type === 'nokvorst') {
-    // verticale dikte van het dakpakket boven de noklijn
-    const vlak = model.dakvlakken[0]
-    const hoek = Math.atan2(vlak.nok2D[1] - vlak.goot2D[1], Math.abs(vlak.goot2D[0] - vlak.nok2D[0]))
-    const dikV = vlak.dikte / Math.cos(hoek)
+  if (rand.type === 'nokvouw') {
+    // gevouwen afdekking die uit de dakvlakken zelf volgt: per vlak een
+    // strook op de plaat, met kleine overlap over de noklijn
+    return model.dakvlakken.map(vlak => {
+      const { nu, nv, ux, uy, nx, ny, hoek } = vlakMaat(vlak)
+      const bR = .3 + .05 // vouwbreedte plus overlap, langs de helling
+      const cx = nu + ux * (bR / 2 - .05) + nx * (vlak.dikte + .015)
+      const cy = nv + uy * (bR / 2 - .05) + ny * (vlak.dikte + .015)
+      return (
+        <mesh key={vlak.id} material={dak} position={[cx, cy, 0]} rotation={[0, 0, hoek]}>
+          <boxGeometry args={[bR, .03, diepte]} />
+        </mesh>
+      )
+    })
+  }
+  if (rand.type === 'boeideel') {
+    // strak: de gevel loopt als boeideel door tot boven de dakrand,
+    // een vlak met de gevelbeplating; de goot ligt verholen daarachter
+    const vlak = model.dakvlakken.find(v => v.kant === rand.kant)
+    const dikV = vlak.dikte / Math.cos(Math.atan2(vol.nok - vol.goot, vol.b / 2 - Math.abs(vol.nokOffset)))
+    const h = dikV + .12
     return (
-      <mesh material={dak} position={[vol.nokOffset, vol.nok + dikV, 0]}>
-        <boxGeometry args={[.36, .12, diepte]} />
+      <mesh material={gevelM} position={[rand.kant * (vol.b / 2 - .02), vol.goot + h / 2 - .01, 0]}>
+        <boxGeometry args={[.04, h, vol.d]} />
       </mesh>
     )
   }
-  if (rand.type === 'goot') {
+  if (rand.type === 'boeikop') {
+    // strak: dun doorlopend boeideel langs de daklijn van de kopgevel,
+    // tot exact in de nokvouw
+    return model.dakvlakken.map(vlak => {
+      const { nu, nv, ux, uy, nx, ny, n0, hoek } = vlakMaat(vlak)
+      const len = n0 - vlak.inzetLangs + .02
+      const h = vlak.dikte + .12
+      const cx = nu + ux * (len / 2) + nx * (vlak.dikte / 2 + .01)
+      const cy = nv + uy * (len / 2) + ny * (vlak.dikte / 2 + .01)
+      return (
+        <mesh key={vlak.id} material={gevelM}
+          position={[cx, cy, rand.richting * (vol.d / 2 - .02)]}
+          rotation={[0, 0, hoek]}>
+          <boxGeometry args={[len, h, .04]} />
+        </mesh>
+      )
+    })
+  }
+  if (rand.type === 'randprofiel') {
+    // kolossaal: dun randprofiel aan het einde van het overstek
     const vlak = model.dakvlakken.find(v => v.kant === rand.kant)
-    const [gu, gv] = vlak.goot2D, [nu, nv] = vlak.nok2D
-    const n0 = Math.hypot(gu - nu, gv - nv)
-    const ux = (gu - nu) / n0, uy = (gv - nv) / n0
-    const eindU = gu + ux * vlak.overstekGoot, eindV = gv + uy * vlak.overstekGoot
+    const { nu, nv, ux, uy, n0 } = vlakMaat(vlak)
+    const eind = n0 - vlak.inzetLangs + vlak.overstekLangs
+    const eu = nu + ux * eind, ev = nv + uy * eind
     return (
-      <mesh material={kozijn} position={[eindU, eindV + vlak.dikte / 2, 0]}>
-        <boxGeometry args={[.13, vlak.dikte + .12, diepte]} />
+      <mesh material={kozijn} position={[eu, ev + vlak.dikte / 2 + .01, 0]}>
+        <boxGeometry args={[.04, .12, diepte]} />
       </mesh>
     )
   }
   if (rand.type === 'windveer') {
-    // schuine afdekking van het dakpakket op beide kopranden
+    // kolossaal: slanke windveer langs de daklijn op de koprand
     return model.dakvlakken.map(vlak => {
-      const [gu, gv] = vlak.goot2D, [nu, nv] = vlak.nok2D
-      const dx = gu - nu, dy = gv - nv
-      const n0 = Math.hypot(dx, dy)
-      const len = n0 + vlak.overstekGoot
-      const ux = dx / n0, uy = dy / n0
-      let nx = -uy, ny = ux
-      if (ny < 0) { nx = -nx; ny = -ny }
+      const { nu, nv, ux, uy, nx, ny, n0, hoek } = vlakMaat(vlak)
+      const len = n0 - vlak.inzetLangs + vlak.overstekLangs
       const cx = nu + ux * (len / 2) + nx * (vlak.dikte / 2)
       const cy = nv + uy * (len / 2) + ny * (vlak.dikte / 2)
       return (
         <mesh key={vlak.id} material={kozijn}
-          position={[cx, cy, rand.richting * (vol.d / 2 + vlak.overstekKop - .04)]}
-          rotation={[0, 0, Math.atan2(dy, dx)]}>
-          <boxGeometry args={[len, vlak.dikte + .08, .08]} />
+          position={[cx, cy, rand.richting * (vol.d / 2 + vlak.overstekKop - .025)]}
+          rotation={[0, 0, hoek]}>
+          <boxGeometry args={[len, vlak.dikte + .06, .05]} />
         </mesh>
       )
     })
+  }
+  if (rand.type === 'gordingen') {
+    // kolossaal: zichtbare slanke profielen onder het overstek
+    const vlak = model.dakvlakken.find(v => v.kant === rand.kant)
+    const { nu, nv, ux, uy, nx, ny, n0, hoek } = vlakMaat(vlak)
+    const n = Math.max(2, Math.round(vol.d / .9))
+    const len = vlak.overstekLangs + 1.1
+    // keper eindigt gelijk met de dakrand en steekt binnendoor terug
+    const sCentrum = n0 - vlak.inzetLangs + vlak.overstekLangs - len / 2
+    const cx = nu + ux * sCentrum + nx * -.08
+    const cy = nv + uy * sCentrum + ny * -.08
+    const kepers = []
+    for (let i = 0; i <= n; i++) {
+      const z = -vol.d / 2 + (vol.d / n) * i
+      kepers.push(
+        <mesh key={i} material={staal} position={[cx, cy, z]} rotation={[0, 0, hoek]}>
+          <boxGeometry args={[len, .12, .06]} />
+        </mesh>
+      )
+    }
+    return <group>{kepers}</group>
   }
   return null
 }

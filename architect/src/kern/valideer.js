@@ -69,8 +69,10 @@ export function valideerModel(model) {
     }
   }
 
-  // 4. alle dakranden gesloten: nok, twee goten, twee windveren
-  const nodig = ['nokvorst', 'goot:1', 'goot:-1', 'windveer:1', 'windveer:-1']
+  // 4. alle dakranden gesloten, passend bij de detailfamilie
+  const nodig = vol.familie === 'strak'
+    ? ['nokvouw', 'boeideel:1', 'boeideel:-1', 'boeikop:1', 'boeikop:-1']
+    : ['nokvouw', 'randprofiel:1', 'randprofiel:-1', 'windveer:1', 'windveer:-1', 'gordingen:1', 'gordingen:-1']
   const aanwezig = model.randafwerking.map(r =>
     r.type + (r.kant != null ? ':' + r.kant : r.richting != null ? ':' + r.richting : ''))
   for (const n of nodig) {
