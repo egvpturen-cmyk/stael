@@ -96,6 +96,49 @@ export function nokProfiel(dakvlakken, flank, dikte) {
     [FL[0] + L.n[0] * dikte, FL[1] + L.n[1] * dikte]]
 }
 
+// 3D-vlak van een dakvlak (bovenzijde plaat als boven=true): punt+normaal
+// in wereldcoordinaten; het hoofdvolume heeft ry 0, een dwarsvolume ry
+// +-pi/2 (nok langs de wereld-x-as)
+export function dakVlak3D(vlak, vol, boven = false) {
+  const { u, n, nok } = vlakRichting(vlak)
+  const vry = vol.ry || 0
+  const c = Math.cos(vry), s = Math.sin(vry)
+  const [px, pz] = vol.pos || [0, 0]
+  // lokaal punt op de daklijn (nok) plus eventueel de plaatdikte
+  const lp = [nok[0] + (boven ? n[0] * vlak.dikte : 0), nok[1] + (boven ? n[1] * vlak.dikte : 0)]
+  const P = [px + c * lp[0], lp[1], pz - s * lp[0]]
+  const N = [c * n[0], n[1], -s * n[0]]
+  return { P, N }
+}
+
+// snijlijn van twee 3D-vlakken: punt + richting
+export function snijlijn(A, B) {
+  const r = [
+    A.N[1] * B.N[2] - A.N[2] * B.N[1],
+    A.N[2] * B.N[0] - A.N[0] * B.N[2],
+    A.N[0] * B.N[1] - A.N[1] * B.N[0],
+  ]
+  const len = Math.hypot(...r)
+  const richting = r.map(x => x / len)
+  // punt op de lijn: los op met de as met de grootste richtingscomponent nul
+  const dA = A.N[0] * A.P[0] + A.N[1] * A.P[1] + A.N[2] * A.P[2]
+  const dB = B.N[0] * B.P[0] + B.N[1] * B.P[1] + B.N[2] * B.P[2]
+  const abs = richting.map(Math.abs)
+  const vast = abs[0] >= abs[1] && abs[0] >= abs[2] ? 0 : abs[1] >= abs[2] ? 1 : 2
+  const [i, j] = vast === 0 ? [1, 2] : vast === 1 ? [0, 2] : [0, 1]
+  const det = A.N[i] * B.N[j] - A.N[j] * B.N[i]
+  const punt = [0, 0, 0]
+  punt[i] = (dA * B.N[j] - dB * A.N[j]) / det
+  punt[j] = (A.N[i] * dB - B.N[i] * dA) / det
+  return { punt, richting }
+}
+
+// punt op een lijn bij gegeven hoogte y
+export function lijnOpY(lijn, y) {
+  const t = (y - lijn.punt[1]) / lijn.richting[1]
+  return [lijn.punt[0] + lijn.richting[0] * t, y, lijn.punt[2] + lijn.richting[2] * t]
+}
+
 export function kopContour(vol) {
   const { b, goot, nok, nokOffset } = vol
   const punten = [[-b / 2, 0], [b / 2, 0], [b / 2, goot]]
@@ -290,6 +333,116 @@ export function bouwModel(p) {
     // raamritme hoort bij de staart, pui en kopelementen bij de kop
   } else {
     voeg(maakVolume('hoofd', 'hoofd', p.volume, p.rand, hoofdOpties))
+  }
+
+  if (p.massa?.type === 'dwarskap') {
+    const hoofd = model.volumes[0]
+    if (!hoofd.plat && hoofd.nok > hoofd.goot) {
+      const m = p.massa
+      const kant = m.kant === -1 ? -1 : 1
+      // klemregels in het model: de dwarsnok blijft ruim onder de
+      // hoofdnok en komt boven de hoofddaklijn op de gevel uit
+      const b2 = Math.max(3, Math.min(m.b2 ?? hoofd.b * .55, hoofd.d * .55))
+      let goot2 = Math.max(2.1, Math.min(m.goot2 ?? hoofd.goot, hoofd.goot + .8))
+      const helling2 = Math.max(30, Math.min(m.helling2 ?? 46, 60))
+      let nok2 = goot2 + Math.tan(helling2 * Math.PI / 180) * b2 / 2
+      nok2 = Math.max(hoofd.goot + .6, Math.min(nok2, hoofd.nok - .45))
+      if (nok2 - goot2 < .45) goot2 = nok2 - .5
+      const uitsteek = Math.max(1.2, Math.min(m.uitsteek ?? 2, 4))
+      const z0 = Math.max(-(hoofd.d / 2 - b2 / 2 - .5), Math.min(hoofd.d / 2 - b2 / 2 - .5, m.z ?? 0))
+      // penetratie: het dwarsvolume loopt naar binnen tot waar het
+      // hoofddak ruim boven de dwarsnok ligt
+      const halveK = kant === 1 ? hoofd.b / 2 - hoofd.nokOffset : hoofd.nokOffset + hoofd.b / 2
+      const tanK = (hoofd.nok - hoofd.goot) / halveK
+      const dx = (nok2 + .4 - hoofd.goot) / tanK
+      const xBinnen = kant * (hoofd.b / 2 - Math.min(dx, hoofd.b / 2 - .4))
+      const xBuiten = kant * (hoofd.b / 2 + uitsteek)
+      const d2 = Math.abs(xBuiten - xBinnen)
+      const posX = (xBuiten + xBinnen) / 2
+      const dwars = maakVolume('dwars', 'dwars', {
+        b: b2, d: d2, goot: goot2, nok: nok2, pos: [posX, z0],
+      }, p.rand)
+      dwars.vol.ry = kant * Math.PI / 2
+      // dakplaten: geen kopoverstek naar binnen; buiten volgens familie;
+      // en gesneden op het bovenvlak van het hoofddak (kilkeperlijn)
+      const hoofdVlak = model.dakvlakken.find(v => v.volumeId === 'hoofd' && v.kant === kant)
+      const snijBoven = dakVlak3D(hoofdVlak, hoofd, true)
+      dwars.vol.overstekKop = 0
+      dwars.dakvlakken.forEach(dv => {
+        dv.overstekKop = 0
+        dv.verandaKop = dwars.vol.familie === 'kolossaal'
+          ? (dwars.vol.overstekLangs * Math.cos(Math.atan2(nok2 - goot2, b2 / 2)) || .6) * .75 : 0
+        dv.snijvlakken = [{ p: snijBoven.P, n: snijBoven.N }]
+      })
+      voeg(dwars)
+      // nokvouw van de dwars: buiten met overlap, binnen tot in het
+      // hoofddak, en gesneden op hetzelfde vlak
+      const dVouw = model.randafwerking.find(r => r.volumeId === 'dwars' && r.type === 'nokvouw')
+      dVouw.diepteVoor = d2 / 2 + (dwars.dakvlakken[0].verandaKop || 0) + STAELDETAILS.nok.kopOverlap
+      dVouw.diepteAchter = d2 / 2 + .05
+      dVouw.snijvlakken = [{ p: snijBoven.P, n: snijBoven.N }]
+      // binnenzijde: geen boeikop en geen gootafwerking binnen het hoofd
+      verwijderRand(model, 'dwars', r => (r.type === 'boeikop' || r.type === 'windveer') && r.richting === -1)
+      for (const r of model.randafwerking.filter(x => x.volumeId === 'dwars'
+        && ['boeideel', 'randprofiel', 'gordingen'].includes(x.type))) {
+        // gootafwerking alleen op het stuk buiten de hoofdgevel
+        r.bereik = [-(d2 / 2) + (Math.abs(kant * hoofd.b / 2 - xBinnen)), d2 / 2]
+      }
+      // maskers: dwars-kop- volledig binnen; dwars-langsgevels binnen de
+      // hoofdgevel; hoofd-langsgevel achter de dwarsdoorsnede
+      wand('dwars:kop-').maskers.push({ poly: kopContour(dwars.vol), reden: 'binnen hoofdvolume' })
+      const binnenLen = Math.abs(kant * hoofd.b / 2 - xBinnen)
+      for (const lk of [1, -1]) {
+        const w2 = wand('dwars:langs' + (lk === 1 ? '+' : '-'))
+        const u0 = wandLokaalU(w2, -d2 / 2), u1 = wandLokaalU(w2, -d2 / 2 + binnenLen)
+        w2.maskers.push({
+          poly: [[Math.min(u0, u1), 0], [Math.max(u0, u1), 0], [Math.max(u0, u1), goot2 + .05], [Math.min(u0, u1), goot2 + .05]],
+          reden: 'binnen hoofdvolume',
+        })
+      }
+      const hw = wand('hoofd:langs' + (kant === 1 ? '+' : '-'))
+      const uc = wandLokaalU(hw, z0)
+      hw.maskers.push({
+        poly: [[uc - b2 / 2, 0], [uc + b2 / 2, 0], [uc + b2 / 2, goot2], [uc, nok2], [uc - b2 / 2, goot2]],
+        reden: 'contact met dwarskap',
+      })
+      // het hoofdboeideel wijkt voor de dwarskap, maar alleen waar het
+      // dwarsdak echt boven de gootband uitkomt: het loopt door tot het
+      // het dwarsdakvlak raakt (ook als de dwarsgoot lager ligt dan de
+      // hoofdgoot), anders blijft een stuk dakranddoorsnede kaal
+      const tan2 = (nok2 - goot2) / (b2 / 2)
+      const dikte2v = dwars.vol.dakDikte / Math.cos(Math.atan2(nok2 - goot2, b2 / 2))
+      const dikVH = hoofd.dakDikte / Math.cos(Math.atan2(hoofd.nok - hoofd.goot,
+        Math.max(.3, Math.min(hoofd.nokOffset + hoofd.b / 2, hoofd.b / 2 - hoofd.nokOffset))))
+      const sSter = Math.max(.1, Math.min(b2 / 2 + .02, (nok2 + dikte2v - (hoofd.goot + dikVH + .1)) / tan2))
+      for (const r of model.randafwerking.filter(x => x.volumeId === 'hoofd'
+        && (x.type === 'boeideel' || x.type === 'randprofiel' || x.type === 'gordingen') && x.kant === kant)) {
+        r.bereiken = [[-hoofd.d / 2, z0 - sSter], [z0 + sSter, hoofd.d / 2]]
+      }
+      // kilkeper: per dwars-dakvlak een doorlopend gevouwen profiel in
+      // het dal, afgeleid uit de twee plaatbovenvlakken
+      for (const dv of dwars.dakvlakken) {
+        const dwarsBoven = dakVlak3D(dv, dwars.vol, true)
+        const lijn = snijlijn(snijBoven, dwarsBoven)
+        // het dal eindigt exact op de dakrand: de kruising van de
+        // killijn met het gevelvlak (strak) of de overstekrand
+        // (kolossaal), en nooit onder de dwarsgoot
+        const xRand = kant * (hoofd.b / 2 + (hoofd.familie === 'kolossaal'
+          ? (hoofd.overstekLangs || 0) * Math.cos(Math.atan2(hoofd.nok - hoofd.goot, halveK)) : 0))
+        const yRand = Math.abs(lijn.richting[0]) > 1e-6
+          ? lijn.punt[1] + lijn.richting[1] * ((xRand - lijn.punt[0]) / lijn.richting[0])
+          : hoofd.goot
+        const yLaag = Math.max(goot2 + .02, yRand + .01)
+        const yHoog = nok2 + dwars.vol.dakDikte * 1.1
+        model.randafwerking.push({
+          type: 'kilkeper', volumeId: 'dwars', zijde: dv.kant,
+          van: lijnOpY(lijn, yLaag), tot: lijnOpY(lijn, yHoog),
+          vlakH: { P: snijBoven.P, N: snijBoven.N },
+          vlakD: { P: dwarsBoven.P, N: dwarsBoven.N },
+          flank: .28, dikte: .03,
+        })
+      }
+    }
   }
 
   if (p.massa?.type === 'aanbouw') {

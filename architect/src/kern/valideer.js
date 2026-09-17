@@ -3,7 +3,7 @@
 // afleiding als de renderer). Een model dat faalt wordt gerepareerd of
 // verworpen; de renderer krijgt alleen gevalideerde modellen te zien.
 
-import { dakOnderY, nokProfiel, wandVol, WAND_DIKTE } from './model.js'
+import { dakOnderY, nokProfiel, wandVol, WAND_DIKTE, dakVlak3D, snijlijn, lijnOpY } from './model.js'
 import { STAELDETAILS } from './staeldetails.js'
 import { leidGeometrieAf, dektPunt, wandTransform, inPolyMetGroei } from './afleiding.js'
 
@@ -26,7 +26,7 @@ const inMasker = (wand, u, v) =>
 export function schilFouten(model, opties = {}) {
   const prims = leidGeometrieAf(model, opties)
   const afwerking = prims.filter(p =>
-    ['boeikop', 'boeideel', 'windveer', 'nokvouw', 'randprofiel', 'daklijst', 'portaal'].includes(p.rol))
+    ['boeikop', 'boeideel', 'windveer', 'nokvouw', 'randprofiel', 'daklijst', 'portaal', 'kilkeper'].includes(p.rol))
   const fouten = []
   const stap = .07
 
@@ -325,7 +325,35 @@ export function valideerModel(model, opties = {}) {
     }
   }
 
-  // 5b. samengestelde massa: de staartnok blijft onder de kopnok
+  // 5b. kil: bij een dwarskap per dwars-dakvlak precies een kilkeper,
+  // onafhankelijk nagerekend op de snijlijn van de twee plaatbovenvlakken
+  for (const vol of model.volumes.filter(v => v.rol === 'dwars' && !v.plat)) {
+    const hoofd = model.volumes.find(v => v.rol === 'hoofd')
+    const kant = (vol.ry || 0) > 0 ? 1 : -1
+    const hoofdVlak = hoofd && model.dakvlakken.find(v => v.volumeId === hoofd.id && v.kant === kant)
+    const kepers = model.randafwerking.filter(r => r.volumeId === vol.id && r.type === 'kilkeper')
+    const vlakken = model.dakvlakken.filter(v => v.volumeId === vol.id)
+    if (kepers.length !== vlakken.length) {
+      fouten.push(vol.id + ': per dwars-dakvlak precies een kilkeper vereist, gevonden ' + kepers.length)
+    } else if (hoofdVlak) {
+      const snijBoven = dakVlak3D(hoofdVlak, hoofd, true)
+      for (const dv of vlakken) {
+        const keper = kepers.find(k => k.zijde === dv.kant)
+        if (!keper) { fouten.push(vol.id + ': kilkeper ontbreekt op dakzijde ' + dv.kant); continue }
+        const lijn = snijlijn(snijBoven, dakVlak3D(dv, vol, true))
+        if (!lijn) { fouten.push(vol.id + ': dakvlakken evenwijdig, killijn onbepaald'); continue }
+        for (const p of [keper.van, keper.tot]) {
+          const her = lijnOpY(lijn, p[1])
+          if (Math.hypot(her[0] - p[0], her[2] - p[2]) > .001)
+            fouten.push(vol.id + ': kilkeper ligt niet op de killijn (zijde ' + dv.kant + ')')
+        }
+        if (keper.tot[1] - keper.van[1] < .3)
+          fouten.push(vol.id + ': kilkeper dekt het dal niet (te kort profiel)')
+      }
+    }
+  }
+
+  // 5c. samengestelde massa: de staartnok blijft onder de kopnok
   const kop = model.volumes.find(v => v.rol === 'kop')
   const staart = model.volumes.find(v => v.rol === 'staart')
   if (kop && staart && staart.nok > kop.nok - .35)

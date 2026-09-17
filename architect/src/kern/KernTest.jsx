@@ -118,6 +118,34 @@ export default function KernTest() {
     ...BASIS, volume: { b: 8.6, d: 11, goot: 3.1, helling: 47 },
     uitbouw: { type: 'zijluifel', kant: -1, uit: 1.6 },
   })
+  // dwarskap met kilkeper: het dal is de kritieke ontmoeting
+  const dwarsM = maak({
+    ...BASIS, volume: { b: 8, d: 13, goot: 2.8, helling: 48 },
+    massa: { type: 'dwarskap', kant: 1, b2: 4.5, goot2: 2.8, helling2: 48, uitsteek: 2.2, z: 1.5 },
+  })
+  const dwars2M = maak({
+    ...BASIS, volume: { b: 10.5, d: 14, goot: 3.2, helling: 40 },
+    rand: { familie: 'kolossaal', overstek: 1.0 },
+    massa: { type: 'dwarskap', kant: -1, b2: 3.2, goot2: 3.0, helling2: 55, uitsteek: 1.4, z: -3 },
+  })
+  const dwZichten = [
+    { naam: 'totaal', camera: { pos: [14, 7, 16], doel: [1, 3, 1] } },
+    { naam: 'dal voor links', camera: { pos: [8, 4.8, 8.5], doel: [2.6, 4.2, 3.6], fov: 35 } },
+    { naam: 'dal voor rechts', camera: { pos: [8.5, 4.8, -4.5], doel: [2.6, 4.2, -.6], fov: 35 } },
+    { naam: 'dal bovenaf', camera: { pos: [3.6, 13, 2.1], doel: [2.9, 4.5, 1.5], fov: 34 } },
+    { naam: 'dal laag vanaf goot', camera: { pos: [7.5, 3, 4.2], doel: [3.3, 3.8, 2.9], fov: 35 } },
+    { naam: 'dwarsnok op hoofddak', camera: { pos: [7.5, 7.5, 7], doel: [2.2, 5.2, 1.5], fov: 35 } },
+    { naam: 'keuring goothoek', camera: { pos: [9.5, 1.4, 5.5], doel: [4.2, 2.9, 3.6], fov: 40 } },
+    { naam: 'keuring ver achter', camera: { pos: [11, 5.5, -12], doel: [2, 3.5, 1], fov: 40 } },
+  ]
+  const dw2Zichten = [
+    { naam: 'totaal', camera: { pos: [-15, 7.5, 16], doel: [-1, 3.2, -1] } },
+    { naam: 'dal bovenaf', camera: { pos: [-4.6, 14, -2.3], doel: [-4.1, 4.8, -3], fov: 34 } },
+    { naam: 'dal close', camera: { pos: [-9.5, 5.2, 1.5], doel: [-3.9, 4.4, -1.8], fov: 33 } },
+    { naam: 'dal schuin achter', camera: { pos: [-9, 5.5, -8.5], doel: [-3.9, 4.4, -4.2], fov: 33 } },
+    { naam: 'keuring goothoek', camera: { pos: [-11, 1.2, 0], doel: [-5.6, 3.2, -2.4], fov: 42 } },
+    { naam: 'keuring hoog voor', camera: { pos: [-8, 11, 11], doel: [-3, 3.5, -2], fov: 40 } },
+  ]
   const ksZichten = [
     { naam: 'totaal', camera: { pos: [14, 7, 17], doel: [0, 3, 0] } },
     { naam: 'overgang kop-staart', camera: { pos: [8.5, 6.5, 6], doel: [1.2, 4.2, 2.4], fov: 35 } },
@@ -156,6 +184,10 @@ export default function KernTest() {
         model={kolossaal.model} fouten={kolossaal.fouten} zichten={kolZichten} />
       <Blok titel="stap2: gevel-elementen op het gastvlak (kader, lamellen, balkon, plint, paneel)"
         model={stap2.model} fouten={stap2.fouten} zichten={stap2Zichten} />
+      <Blok titel="dwarskap: kilkeper als doorlopend gevouwen profiel in het dal"
+        model={dwarsM.model} fouten={dwarsM.fouten} zichten={dwZichten} />
+      <Blok titel="dwarskap2: smal en steil op breed en flauw, kolossaal, verschoven"
+        model={dwars2M.model} fouten={dwars2M.fouten} zichten={dw2Zichten} />
       <Blok titel="kopstaart: hoog kopgebouw met lagere staart"
         model={kopstaart.model} fouten={kopstaart.fouten} zichten={ksZichten} />
       <Blok titel="aanbouw: geschakeld plat volume plus veranda op kolommen"

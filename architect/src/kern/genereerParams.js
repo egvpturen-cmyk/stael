@@ -65,6 +65,18 @@ export function willekeurigeParams(seed) {
       h: Math.min(goot - .15, 2.5 + r() * .7),
       z: (r() - .3) * d * .3,
     }
+  } else if (lot < .58) {
+    // dwarskap, bewust ook in vervelende verhoudingen: smal op breed,
+    // breed op smal, verschoven posities, beide detailfamilies
+    const smal = r() < .5
+    params.massa = {
+      type: 'dwarskap', kant: r() < .5 ? -1 : 1,
+      b2: smal ? 3 + r() * 1.6 : b * (.5 + r() * .4),
+      goot2: goot - .4 + r() * 1.1,
+      helling2: 32 + r() * 26,
+      uitsteek: 1.2 + r() * 2.3,
+      z: (r() - .5) * d * .8,
+    }
   }
   if (r() < .22) params.uitbouw = { type: 'veranda', diepte: 1.8 + r() * 1.6, kolommen: 2 + Math.floor(r() * 2) }
   else if (r() < .15) params.uitbouw = { type: 'portaal', uit: .5 + r() * 1.6 }
