@@ -119,18 +119,21 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
 
 // glazen kopgevel die de daklijn volgt, met stramienstijl, kader,
 // lamellen en balkon als opties
-function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', kader, kaderKleur, lamellen, balkon, puiFactor = 0, penanten = null, ry = 0, xc = 0 }) {
+function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', kader, kaderKleur, lamellen, balkon, puiFactor = 0, puiX = 0, penanten = null, ry = 0, xc = 0 }) {
   const gB = b * (puiFactor || (stramien === 'vlak' ? .7 : .62))
   const marge = .3
+  // x is lokaal binnen de pui; de echte gevelpositie is x + puiX
+  const apexLokaal = nokOffset - puiX
   const geo = useMemo(() => {
     const s = new THREE.Shape()
     s.moveTo(-gB / 2, .06); s.lineTo(gB / 2, .06)
-    s.lineTo(gB / 2, randYOp(gB / 2, b, goot, nok, nokOffset, marge))
-    if (!plat && nok > goot) s.lineTo(nokOffset, randYOp(nokOffset, b, goot, nok, nokOffset, marge))
-    s.lineTo(-gB / 2, randYOp(-gB / 2, b, goot, nok, nokOffset, marge))
+    s.lineTo(gB / 2, randYOp(gB / 2 + puiX, b, goot, nok, nokOffset, marge))
+    if (!plat && nok > goot && apexLokaal > -gB / 2 && apexLokaal < gB / 2)
+      s.lineTo(apexLokaal, randYOp(nokOffset, b, goot, nok, nokOffset, marge))
+    s.lineTo(-gB / 2, randYOp(-gB / 2 + puiX, b, goot, nok, nokOffset, marge))
     s.closePath()
     return new THREE.ShapeGeometry(s)
-  }, [gB, b, goot, nok, nokOffset, plat])
+  }, [gB, b, goot, nok, nokOffset, plat, puiX]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const afstandStijl = stramien === 'vlak' ? 1.9 : stramien === 'grid' ? 1.0 : .8
   const nStijl = Math.max(2, Math.round(gB / afstandStijl))
@@ -141,7 +144,7 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     const n = penanten.n || 3
     for (let i = 1; i <= n; i++) {
       const x = -gB / 2 + (gB / (n + 1)) * i
-      let h = randYOp(x, b, goot, nok, nokOffset, marge + .05)
+      let h = randYOp(x + puiX, b, goot, nok, nokOffset, marge + .05)
       if (penanten.hMax) h = Math.min(h, penanten.hMax)
       delen.push(
         <mesh key={'p' + i} material={pMat} position={[x, h / 2 + .05, .06]}>
@@ -152,7 +155,7 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
   }
   for (let i = 0; i <= nStijl; i++) {
     const x = -gB / 2 + (gB / nStijl) * i
-    const h = randYOp(x, b, goot, nok, nokOffset, marge) - .06
+    const h = randYOp(x + puiX, b, goot, nok, nokOffset, marge) - .06
     delen.push(
       <mesh key={'s' + i} material={MAT.kozijn} position={[x, h / 2 + .06, .02]}>
         <boxGeometry args={[STAEL.kozijnDikte, h, STAEL.kozijnDikte * 1.6]} />
@@ -183,18 +186,18 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     const kDelen = []
     for (const kant of [-1, 1]) {
       const x = kant * (gB / 2 + .12)
-      const h = randYOp(kant * gB / 2, b, goot, nok, nokOffset, .02)
+      const h = randYOp(kant * gB / 2 + puiX, b, goot, nok, nokOffset, .02)
       kDelen.push(
         <mesh key={'v' + kant} material={kMat} position={[x, h / 2, .1]}>
           <boxGeometry args={[.28, h, .5]} />
         </mesh>
       )
     }
-    const top = [[-gB / 2 - .12, nokOffset], [nokOffset, gB / 2 + .12]]
+    const top = [[-gB / 2 - .12, apexLokaal], [apexLokaal, gB / 2 + .12]]
     if (!plat && nok > goot) {
       top.forEach(([x1, x2], i) => {
-        const y1 = randYOp(Math.max(-b / 2, Math.min(b / 2, x1)), b, goot, nok, nokOffset, .02)
-        const y2 = randYOp(Math.max(-b / 2, Math.min(b / 2, x2)), b, goot, nok, nokOffset, .02)
+        const y1 = randYOp(Math.max(-b / 2, Math.min(b / 2, x1 + puiX)), b, goot, nok, nokOffset, .02)
+        const y2 = randYOp(Math.max(-b / 2, Math.min(b / 2, x2 + puiX)), b, goot, nok, nokOffset, .02)
         const len = Math.hypot(x2 - x1, y2 - y1) + .3
         kDelen.push(
           <mesh key={'s' + i} material={kMat}
@@ -239,11 +242,77 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     )
   }
   return (
-    <group position={[xc, 0, z]} rotation={[0, ry, 0]}>
+    <group position={[xc + puiX, 0, z]} rotation={[0, ry, 0]}>
       <mesh geometry={geo} material={MAT.glas} />
       {delen}
     </group>
   )
+}
+
+// plintband: onderste geveldeel in een tweede materiaal, rondom
+function Plint({ spec }) {
+  if (!spec.plint) return null
+  const { b, d } = spec
+  const h = spec.plint.h
+  const mat = stdMat(spec.plint.kleur)
+  return (
+    <group>
+      <mesh material={mat} position={[0, h / 2, d / 2 + .02]}><boxGeometry args={[b + .02, h, .05]} /></mesh>
+      <mesh material={mat} position={[0, h / 2, -d / 2 - .02]}><boxGeometry args={[b + .02, h, .05]} /></mesh>
+      <mesh material={mat} position={[b / 2 + .02, h / 2, 0]}><boxGeometry args={[.05, h, d + .02]} /></mesh>
+      <mesh material={mat} position={[-b / 2 - .02, h / 2, 0]}><boxGeometry args={[.05, h, d + .02]} /></mesh>
+    </group>
+  )
+}
+
+// vrij lamellenveld voor een gevel (zonwering voor een pui of vide)
+function LamellenVelden({ spec }) {
+  if (!spec.lamellenVelden) return null
+  return spec.lamellenVelden.map((v, i) => {
+    const mat = stdMat(v.kleur || KLEUREN.houtBlank)
+    const lats = []
+    for (let y = v.y0; y <= v.y1; y += v.stap || .3) {
+      lats.push(
+        <mesh key={y} material={mat} position={[v.x || 0, y, spec.d / 2 + (v.uit ?? .3)]}>
+          <boxGeometry args={[v.w, .08, .12]} />
+        </mesh>
+      )
+    }
+    return <group key={i}>{lats}</group>
+  })
+}
+
+// kleine opbouw op een plat dak
+function DakOpbouw({ spec }) {
+  if (!spec.dakOpbouw) return null
+  const o = spec.dakOpbouw
+  return (
+    <group position={[o.x || 0, spec.nok + o.h / 2 + .1, o.z || 0]}>
+      <mesh material={stdMat(o.kleur || spec.gevel)}><boxGeometry args={[o.b, o.h, o.d]} /></mesh>
+      <mesh material={MAT.staal} position={[0, o.h / 2 + .06, 0]}><boxGeometry args={[o.b + .2, .12, o.d + .2]} /></mesh>
+    </group>
+  )
+}
+
+// geschakelde platte aanbouwvolumes (garage, berging, entreeblok),
+// met een dakplaat die als luifel kan doorsteken
+function AanbouwVolumes({ spec }) {
+  if (!spec.aanbouwen) return null
+  return spec.aanbouwen.map((a, i) => (
+    <group key={i} position={[a.x, 0, a.z]}>
+      <mesh material={stdMat(a.kleur || spec.gevel)} position={[0, a.h / 2, 0]}>
+        <boxGeometry args={[a.b, a.h, a.d]} />
+      </mesh>
+      <mesh material={MAT.staal} position={[(a.dakUitX || 0) / 2, a.h + .08, (a.dakUitZ || 0) / 2]}>
+        <boxGeometry args={[a.b + .4 + Math.abs(a.dakUitX || 0), .16, a.d + .4 + Math.abs(a.dakUitZ || 0)]} />
+      </mesh>
+      {a.deur && (
+        <mesh material={MAT.kozijn} position={[0, 1.1, a.d / 2 + .05]}>
+          <boxGeometry args={[Math.min(a.b - .8, 2.4), 2.2, .08]} />
+        </mesh>
+      )}
+    </group>
+  ))
 }
 
 // gevelpanelen: dichte vlakken op kop- of langsgevel (schuifpaneel,
@@ -372,7 +441,8 @@ function MassaEnkel({ spec }) {
         kleur={spec.dak} plat={plat} veranda={verandaVan(spec)} zijLuifel={spec.zijLuifel} />
       <KopGevel b={b} goot={goot} nok={nok} nokOffset={off} plat={plat} z={d / 2 + .04}
         stramien={spec.kop.stramien} kader={spec.kop.kader} kaderKleur={spec.kop.kaderKleur}
-        lamellen={spec.kop.lamellen} puiFactor={spec.kop.puiFactor} penanten={spec.kop.penanten}
+        lamellen={spec.kop.lamellen} puiFactor={spec.kop.puiFactor} puiX={spec.kop.puiX || 0}
+        penanten={spec.kop.penanten}
         balkon={spec.elementen.includes('balkon')} />
       <LangsGevels spec={spec} b={b} d={d} goot={goot} />
       {spec.typologie.id === 'paviljoen' && [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([kx, kz]) => (
@@ -658,6 +728,10 @@ export function Woning({ spec, programma }) {
       <Elementen spec={spec} />
       <Panelen spec={spec} />
       <Portaal spec={spec} />
+      <Plint spec={spec} />
+      <LamellenVelden spec={spec} />
+      <DakOpbouw spec={spec} />
+      <AanbouwVolumes spec={spec} />
       <Kavel spec={spec} programma={programma} />
     </group>
   )
