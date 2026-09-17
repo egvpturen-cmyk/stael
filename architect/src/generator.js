@@ -1,4 +1,5 @@
 import { STAEL, KLEUREN, MASSAS, STRAMIENEN, KOPTHEMAS, SECUNDAIR, TYPOLOGIEEN, typologieenVoor } from './ontwerptaal.js'
+import { valideerSpec, repareerSpec } from './validatie.js'
 
 // deterministische pseudo-random: zelfde programma en ronde geven
 // dezelfde set, een nieuwe ronde geeft echt andere combinaties
@@ -29,7 +30,7 @@ function schud(r, lijst) {
   return l
 }
 
-export function genereerVarianten(prog, ronde = 0) {
+export function genereerVarianten(prog, ronde = 0, opties = {}) {
   const basis = ronde * 7919 + 13
   const r = rng((basis + 1) * 2654435761)
   const kandidaten = typologieenVoor(prog.dak, prog.lagen)
@@ -42,9 +43,16 @@ export function genereerVarianten(prog, ronde = 0) {
   const doel = 5 + Math.floor(r() * 3) // 5 tot 7
   const lijst = []
   let i = 0, poging = 0
-  while (lijst.length < doel && poging < volgorde.length * 3) {
+  while (lijst.length < doel && poging < volgorde.length * 4) {
     const { t, m } = volgorde[i % volgorde.length]
-    const v = maakVariant(t, m, prog, basis + poging * 31 + i * 7)
+    let v = maakVariant(t, m, prog, basis + poging * 31 + i * 7)
+    // geometrie-validatie: repareren of verwerpen, nooit doorlaten
+    if (v && !opties.ruw) {
+      if (valideerSpec(v).length) {
+        v = repareerSpec(v)
+        if (valideerSpec(v).length) v = null
+      }
+    }
     if (v) lijst.push(v)
     i++; poging++
   }
@@ -275,6 +283,8 @@ export function bouwSpec(p) {
     beschrijving: p.beschrijving || '',
     zinnen: [],
   }
+  // ook presets gaan door de geometrie-reparatie (clippen, klemmen)
+  if (!p.ruw && valideerSpec(spec).length) repareerSpec(spec)
   return spec
 }
 

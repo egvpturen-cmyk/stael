@@ -3,28 +3,26 @@ import { useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, ContactShadows, Line } from '@react-three/drei'
 import { STAEL, KLEUREN } from './ontwerptaal.js'
+import { randYOp, clipLat, clipVlak } from './geometrie.js'
 
 const MAT = {
   // metalness laag houden: zonder environment-map reflecteert metaal zwart
   kozijn: new THREE.MeshStandardMaterial({ color: STAEL.kozijnKleur, roughness: .5, metalness: .2 }),
-  glas: new THREE.MeshStandardMaterial({ color: '#33404a', roughness: .12, metalness: .3 }),
+  // licht reflecterend blauwgrijs glas, geen zwart gat
+  glas: new THREE.MeshStandardMaterial({ color: '#46586a', roughness: .08, metalness: .25 }),
   staal: new THREE.MeshStandardMaterial({ color: '#26262a', roughness: .45, metalness: .35 }),
   gras: new THREE.MeshStandardMaterial({ color: '#3a4630', roughness: 1 }),
   terras: new THREE.MeshStandardMaterial({ color: '#6e685d', roughness: .95 }),
   houtAccent: new THREE.MeshStandardMaterial({ color: '#8a7a5e', roughness: .8 }),
+  lamel: new THREE.MeshStandardMaterial({ color: '#84705a', roughness: .85 }),
   baksteen: new THREE.MeshStandardMaterial({ color: KLEUREN.baksteen, roughness: .95 }),
   licht: new THREE.MeshStandardMaterial({ color: KLEUREN.stucLicht, roughness: .9 }),
 }
 const stdMat = kleur => new THREE.MeshStandardMaterial({ color: kleur, roughness: .85 })
 const dakMatVan = kleur => new THREE.MeshStandardMaterial({ color: kleur, roughness: .6, metalness: .12 })
 
-// nokrand van het gevelprofiel: y van de dakrand op positie x
-function randYOp(x, b, goot, nok, nokOffset = 0, marge = 0) {
-  if (nok <= goot) return goot - marge
-  const t = nokOffset
-  if (x <= t) return goot + (nok - goot) * ((x + b / 2) / (t + b / 2)) - marge
-  return goot + (nok - goot) * ((b / 2 - x) / (b / 2 - t)) - marge
-}
+// de dakcontour-wiskunde (randYOp, clipLat, clipVlak) komt uit
+// geometrie.js zodat renderer en validator dezelfde regels delen
 
 // gevelprofiel (vijfhoek of rechthoek), geextrudeerd over de diepte
 function Volume({ b, d, goot, nok, nokOffset = 0, kleur, plat }) {
@@ -85,6 +83,15 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
           </mesh>
         )
       })}
+      {/* nokkap en gootranden: aansluitingen zichtbaar dicht */}
+      <mesh material={mat} position={[nokOffset, nok + .18, zMid]}>
+        <boxGeometry args={[.34, .12, diepte]} />
+      </mesh>
+      {[-1, 1].map(k => (
+        <mesh key={'goot' + k} material={mat} position={[k * (b / 2 + overstek * .55), goot + .04, zMid]}>
+          <boxGeometry args={[.16, .16, diepte]} />
+        </mesh>
+      ))}
       {zijLuifel && !plat && (() => {
         // richting van nok naar goot aan deze kant, doorgetrokken voorbij de gevel
         const dx = zijLuifel.kant * b / 2 - nokOffset, dy = goot - nok
@@ -157,8 +164,8 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     const x = -gB / 2 + (gB / nStijl) * i
     const h = randYOp(x + puiX, b, goot, nok, nokOffset, marge) - .06
     delen.push(
-      <mesh key={'s' + i} material={MAT.kozijn} position={[x, h / 2 + .06, .02]}>
-        <boxGeometry args={[STAEL.kozijnDikte, h, STAEL.kozijnDikte * 1.6]} />
+      <mesh key={'s' + i} material={MAT.kozijn} position={[x, h / 2 + .06, .07]}>
+        <boxGeometry args={[STAEL.kozijnDikte, h, STAEL.kozijnDikte * 2.2]} />
       </mesh>
     )
   }
@@ -167,15 +174,15 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     for (let j = 1; j <= nDwars; j++) {
       const y = (goot / (nDwars + 1)) * j + .3
       delen.push(
-        <mesh key={'d' + j} material={MAT.kozijn} position={[0, y, .02]}>
-          <boxGeometry args={[gB, STAEL.kozijnDikte, STAEL.kozijnDikte * 1.4]} />
+        <mesh key={'d' + j} material={MAT.kozijn} position={[0, y, .07]}>
+          <boxGeometry args={[gB, STAEL.kozijnDikte, STAEL.kozijnDikte * 2]} />
         </mesh>
       )
     }
   } else {
     delen.push(
-      <mesh key="regel" material={MAT.kozijn} position={[0, goot, .02]}>
-        <boxGeometry args={[gB, STAEL.kozijnDikte, STAEL.kozijnDikte * 1.6]} />
+      <mesh key="regel" material={MAT.kozijn} position={[0, goot, .07]}>
+        <boxGeometry args={[gB, STAEL.kozijnDikte, STAEL.kozijnDikte * 2.2]} />
       </mesh>
     )
   }
@@ -217,12 +224,19 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     delen.push(<group key="kader">{kDelen}</group>)
   }
   if (lamellen && nok > goot) {
+    // houten latten met echte tussenruimte, exact geclipt op de daklijn
     const lams = []
-    for (let y = goot + .25; y < randYOp(nokOffset, b, goot, nok, nokOffset, marge + .25); y += .3) {
-      const halfB = Math.min(gB / 2, (randYOp(nokOffset, b, goot, nok, nokOffset, 0) - y) / (nok - goot) * (b / 2) + gB * .18)
+    const profiel = { b, goot, nok, off: nokOffset }
+    for (let y = goot + .25; y < nok - .3; y += .3) {
+      const lat = clipLat(nokOffset, gB + .8, y, profiel, .22)
+      if (!lat) continue
+      // binnen het puibereik blijven (lokaal stelsel: lat.x - puiX)
+      const van = Math.max(lat.x - lat.breedte / 2, puiX - gB / 2 - .3)
+      const tot = Math.min(lat.x + lat.breedte / 2, puiX + gB / 2 + .3)
+      if (tot - van < .3) continue
       lams.push(
-        <mesh key={y} material={MAT.houtAccent} position={[nokOffset * .5, y, .12]}>
-          <boxGeometry args={[Math.max(halfB * 2, .8), .09, .12]} />
+        <mesh key={y} material={MAT.lamel} position={[(van + tot) / 2 - puiX, y, .16]}>
+          <boxGeometry args={[tot - van, .07, .16]} />
         </mesh>
       )
     }
@@ -268,13 +282,21 @@ function Plint({ spec }) {
 // vrij lamellenveld voor een gevel (zonwering voor een pui of vide)
 function LamellenVelden({ spec }) {
   if (!spec.lamellenVelden) return null
+  const profiel = { b: spec.b, goot: spec.goot, nok: spec.nok, off: spec.nokOffset || 0 }
+  const zadel = !spec.plat && spec.nok > spec.goot
   return spec.lamellenVelden.map((v, i) => {
-    const mat = stdMat(v.kleur || KLEUREN.houtBlank)
+    const mat = v.kleur ? stdMat(v.kleur) : MAT.lamel
     const lats = []
     for (let y = v.y0; y <= v.y1; y += v.stap || .3) {
+      let x = v.x || 0, w = v.w
+      if (zadel) {
+        const lat = clipLat(x, w, y, profiel, .2)
+        if (!lat) continue
+        x = lat.x; w = lat.breedte
+      }
       lats.push(
-        <mesh key={y} material={mat} position={[v.x || 0, y, spec.d / 2 + (v.uit ?? .3)]}>
-          <boxGeometry args={[v.w, .08, .12]} />
+        <mesh key={y} material={mat} position={[x, y, spec.d / 2 + (v.uit ?? .3)]}>
+          <boxGeometry args={[w, .07, .16]} />
         </mesh>
       )
     }
@@ -319,12 +341,20 @@ function AanbouwVolumes({ spec }) {
 // gevelaccent, garagedeur), als dunne platen net voor de gevel
 function Panelen({ spec }) {
   if (!spec.panelen) return null
+  const profiel = { b: spec.b, goot: spec.goot, nok: spec.nok, off: spec.nokOffset || 0 }
+  const zadel = !spec.plat && spec.nok > spec.goot
   return spec.panelen.map((p, i) => {
     const mat = stdMat(p.kleur)
     if (p.vlak === 'kop') {
+      let { y, h } = p
+      if (zadel) {
+        const c = clipVlak(p.x || 0, p.y, p.w, p.h, profiel)
+        if (!c) return null
+        y = c.y; h = c.h
+      }
       return (
-        <mesh key={i} material={mat} position={[p.x || 0, p.y, spec.d / 2 + (p.uit ?? .08)]}>
-          <boxGeometry args={[p.w, p.h, .07]} />
+        <mesh key={i} material={mat} position={[p.x || 0, y, spec.d / 2 + (p.uit ?? .08)]}>
+          <boxGeometry args={[p.w, h, .07]} />
         </mesh>
       )
     }
@@ -416,10 +446,12 @@ function LangsGevels({ spec, b, d, goot }) {
       const y = h / 2 + .3
       ramen.push(
         <group key={kant + ':' + i} position={[kant * (b / 2 + .04), y, z]} rotation={[0, kant * Math.PI / 2, 0]}>
-          <mesh material={MAT.glas}><planeGeometry args={[1.0, h]} /></mesh>
-          <mesh material={MAT.kozijn} position={[0, 0, -.015]}>
-            <boxGeometry args={[1.0 + STAEL.kozijnDikte * 2, h + STAEL.kozijnDikte * 2, .03]} />
-          </mesh>
+          <mesh material={MAT.glas}><planeGeometry args={[.9, h]} /></mesh>
+          {/* kozijn met negge: het kader steekt voor het glas uit */}
+          <mesh material={MAT.kozijn} position={[0, h / 2 + STAEL.kozijnDikte / 2, .05]}><boxGeometry args={[.9 + STAEL.kozijnDikte * 2, STAEL.kozijnDikte, .12]} /></mesh>
+          <mesh material={MAT.kozijn} position={[0, -h / 2 - STAEL.kozijnDikte / 2, .05]}><boxGeometry args={[.9 + STAEL.kozijnDikte * 2, STAEL.kozijnDikte, .12]} /></mesh>
+          <mesh material={MAT.kozijn} position={[-.45 - STAEL.kozijnDikte / 2, 0, .05]}><boxGeometry args={[STAEL.kozijnDikte, h, .12]} /></mesh>
+          <mesh material={MAT.kozijn} position={[.45 + STAEL.kozijnDikte / 2, 0, .05]}><boxGeometry args={[STAEL.kozijnDikte, h, .12]} /></mesh>
         </group>
       )
     }
@@ -571,10 +603,12 @@ function GlasBand({ b, d, x = 0, z = 0, y0, y1 }) {
           <group key={i} position={[px, 0, pz]} rotation={[0, ry, 0]}>
             <mesh material={MAT.glas}><planeGeometry args={[breed, h]} /></mesh>
             {Array.from({ length: nS + 1 }, (_, j) => (
-              <mesh key={j} material={MAT.kozijn} position={[-breed / 2 + (breed / nS) * j, 0, .02]}>
-                <boxGeometry args={[STAEL.kozijnDikte, h, STAEL.kozijnDikte]} />
+              <mesh key={j} material={MAT.kozijn} position={[-breed / 2 + (breed / nS) * j, 0, .06]}>
+                <boxGeometry args={[STAEL.kozijnDikte, h, STAEL.kozijnDikte * 2]} />
               </mesh>
             ))}
+            <mesh material={MAT.kozijn} position={[0, h / 2 - .02, .06]}><boxGeometry args={[breed, STAEL.kozijnDikte, STAEL.kozijnDikte * 2]} /></mesh>
+            <mesh material={MAT.kozijn} position={[0, -h / 2 + .02, .06]}><boxGeometry args={[breed, STAEL.kozijnDikte, STAEL.kozijnDikte * 2]} /></mesh>
           </group>
         )
       })}
@@ -803,7 +837,7 @@ function Elementen({ spec }) {
   if (el('dakkapel') && !spec.plat && ['enkel', 'asym'].includes(spec.massa)) {
     const off = spec.nokOffset || 0
     const x = (off + b / 2) / 2
-    const y = randYOp(x, b, goot, nok, off, 0) - .55
+    const y = Math.min(randYOp(x, b, goot, nok, off, 0) - .55, nok - .95)
     delen.push(
       <group key="dakkapel" position={[x, y, d * .1]}>
         <mesh material={stdMat(spec.gevel)}><boxGeometry args={[2.0, 1.3, 1.5]} /></mesh>
