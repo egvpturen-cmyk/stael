@@ -205,9 +205,15 @@ function maakKernVariant(t, massaWens, prog, seed) {
       params.gevelElementen.push({ wand: 'kop+', type: 'kader', kleur: accentHex })
     }
     if (s.kopThema === 'puiLamellen' && !plat) {
+      // het veld hoort in de geveltop boven de goot van de KOPGEVEL;
+      // bij kop-en-staart ligt die hoger dan de basisgoot
+      const kopGoot = massa === 'kopstaart' ? Math.min(goot + 1.1, regels.gootMax + 1.1) : goot
+      const kopNok = massa === 'kopstaart'
+        ? Math.min(kopGoot + Math.tan(grad(helling)) * b / 2, Math.max(regels.nokMax, kopGoot + 1.6))
+        : nok
       params.gevelElementen.push({
-        wand: 'kop+', type: 'lamellenveld', grens: 'dakcontour',
-        v0: goot + .3, v1: Math.max(goot + 1, nok - .8), kleur: '#84705a',
+        wand: 'kop+', type: 'lamellenveld', grens: 'dakcontour', uit: .04,
+        v0: kopGoot + .3, v1: Math.max(kopGoot + 1, kopNok - .8), kleur: '#84705a',
       })
     }
     if (s.kopThema === 'puiPenanten') {

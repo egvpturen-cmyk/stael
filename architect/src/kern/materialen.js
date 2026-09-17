@@ -185,8 +185,8 @@ export const MATERIALEN = {
   // ---- terrein ----
   gras: {
     naam: 'Gras', cat: 'terrein', dir: 'Grass004',
-    kleurmap: true, tegel: [9, 9],
-    kleuren: [{ id: 'gras', naam: 'Gras', hex: '#a9b18f' }],
+    kleurmap: false, tegel: [7, 7], roughness: .95,
+    kleuren: [{ id: 'gras', naam: 'Gras', hex: '#7d8a63' }],
   },
   bestrating: {
     naam: 'Bestrating', cat: 'terrein', dir: 'PavingStones070',
