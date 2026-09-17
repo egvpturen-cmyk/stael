@@ -60,3 +60,37 @@ variantgenerator en een "verzin het voor mij"-functie stuurt:
   of hoort het bij het opslaan-zonder-account-mechanisme van fase 3?
 - Is "verzin het voor mij" een aparte knop naast het programma, of de
   standaardroute voor nieuwe bezoekers?
+
+## 2. Pratende Live Architect (spraakgestuurd ontwerpen)
+
+Status: genoteerd, niet gepland. Bouwen na fase 3 op zijn vroegst
+(dan bestaat opslag en de sessie-flow).
+
+### Het idee
+
+De klant praat met de Live Architect zoals met een mens, via een
+levensechte stem-AI (denk aan OpenAI GPT-Live/Realtime API of
+Sesame-achtige stemmen), in plaats van te typen en klikken. De
+spraak-AI is via function calling gekoppeld aan de ontwerpstate:
+gesproken wensen ("goot lager", "pui breder", "laat een variant met
+corten zien") worden parameterwijzigingen die live op het 3D-model
+gebeuren. De architect-stem reageert en stelt zelf vragen zoals een
+echte architect dat doet ("wil je de entree aan de wegzijde?").
+
+### Waarom dit kan werken
+
+Het technisch fundament ligt er al: het hele ontwerp is een JSON-
+parameterset, dus elke stem-actie is een parametermutatie die door de
+bestaande validatiepoort gaat (bouwModel, valideerModel,
+repareerModel). De stem hoeft niets van geometrie te weten; hij muteert
+parameters en de kern bewaakt de wetten. Potentieel een enorme
+wow-factor voor de Live Architect-sessie zelf.
+
+### Aandachtspunten bij oppakken
+
+- Kwaliteit van Nederlandse stemmen vergelijken voordat er iets wordt
+  gekozen.
+- Kosten per gespreksminuut in kaart brengen.
+- De nieuwste GPT-Live-API is aangekondigd maar nog niet uit; de
+  oudere Realtime API is wel beschikbaar.
+- Fallback naar typen en klikken moet altijd blijven bestaan.
