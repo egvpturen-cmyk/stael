@@ -34,6 +34,42 @@ export function dakOnderY(u, vol) {
   return goot + (nok - goot) * ((b / 2 - u) / (b / 2 - nokOffset))
 }
 
+// snijpunt van twee lijnen P + t*u en Q + s*v
+export function snijd(P, u, Q, v) {
+  const det = u[0] * v[1] - u[1] * v[0]
+  const t = ((Q[0] - P[0]) * v[1] - (Q[1] - P[1]) * v[0]) / det
+  return [P[0] + u[0] * t, P[1] + u[1] * t]
+}
+
+// richtingen van een dakvlak: eenheid nok->goot en normaal omhoog
+export function vlakRichting(vlak) {
+  const [gu, gv] = vlak.goot2D, [nu, nv] = vlak.nok2D
+  const n0 = Math.hypot(gu - nu, gv - nv)
+  const u = [(gu - nu) / n0, (gv - nv) / n0]
+  let n = [-u[1], u[0]]
+  if (n[1] < 0) n = [-n[0], -n[1]]
+  return { u, n, n0, nok: [nu, nv] }
+}
+
+// de nok is EEN doorlopende gevouwen afdekking: een knikprofiel waarvan
+// de vouwlijn exact op het snijpunt van de twee plaatbovenvlakken ligt
+// en de flanken strak op beide dakvlakken aansluiten
+export function nokProfiel(dakvlakken, flank, dikte) {
+  const [L, R] = dakvlakken.map(vl => {
+    const { u, n, nok } = vlakRichting(vl)
+    return { u, n, B: [nok[0] + n[0] * vl.dikte, nok[1] + n[1] * vl.dikte] }
+  })
+  const S = snijd(L.B, L.u, R.B, R.u)
+  const Sb = snijd(
+    [L.B[0] + L.n[0] * dikte, L.B[1] + L.n[1] * dikte], L.u,
+    [R.B[0] + R.n[0] * dikte, R.B[1] + R.n[1] * dikte], R.u)
+  const FL = [S[0] + L.u[0] * flank, S[1] + L.u[1] * flank]
+  const FR = [S[0] + R.u[0] * flank, S[1] + R.u[1] * flank]
+  const FLb = [FL[0] + L.n[0] * dikte, FL[1] + L.n[1] * dikte]
+  const FRb = [FR[0] + R.n[0] * dikte, FR[1] + R.n[1] * dikte]
+  return [FL, S, FR, FRb, Sb, FLb]
+}
+
 // kopgevelcontour: eigen elementtype, volgt de volledige dakcontour
 // (driehoek of vijfhoek bij verschoven nok)
 export function kopContour(vol) {
@@ -152,22 +188,29 @@ export function bouwModel(p) {
   }
 
   // randafwerking: automatisch langs alle dakranden, zodat elke rand
-  // per constructie gesloten is; de invulling volgt de detailfamilie
-  const randafwerking = [{ type: 'nokvouw', volumeId: vol.id }]
+  // per constructie gesloten is; de invulling volgt de detailfamilie.
+  // boeidelen en windveren worden bij de nok ingekort met de
+  // vouwbreedte zodat ze exact tot in de vouw lopen (geen stapeling)
+  const nokTrim = STAELDETAILS.nok.vouwBreedte
+  const randafwerking = [{
+    type: 'nokvouw', volumeId: vol.id,
+    profiel: nokProfiel(dakvlakken, STAELDETAILS.nok.vouwBreedte, STAELDETAILS.nok.dikte),
+    diepte: vol.d + 2 * vol.overstekKop,
+  }]
   if (familie === 'strak') {
     // gevel en dakrand vormen een vlak: doorlopend boeideel, verholen goot
     randafwerking.push(
       { type: 'boeideel', kant: 1, volumeId: vol.id },
       { type: 'boeideel', kant: -1, volumeId: vol.id },
-      { type: 'boeikop', richting: 1, volumeId: vol.id },
-      { type: 'boeikop', richting: -1, volumeId: vol.id },
+      { type: 'boeikop', richting: 1, volumeId: vol.id, nokTrim },
+      { type: 'boeikop', richting: -1, volumeId: vol.id, nokTrim },
     )
   } else {
     randafwerking.push(
       { type: 'randprofiel', kant: 1, volumeId: vol.id },
       { type: 'randprofiel', kant: -1, volumeId: vol.id },
-      { type: 'windveer', richting: 1, volumeId: vol.id },
-      { type: 'windveer', richting: -1, volumeId: vol.id },
+      { type: 'windveer', richting: 1, volumeId: vol.id, nokTrim },
+      { type: 'windveer', richting: -1, volumeId: vol.id, nokTrim },
       { type: 'gordingen', kant: 1, volumeId: vol.id },
       { type: 'gordingen', kant: -1, volumeId: vol.id },
     )

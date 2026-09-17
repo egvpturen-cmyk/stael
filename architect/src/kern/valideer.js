@@ -2,7 +2,8 @@
 // faalt wordt gerepareerd of verworpen; de renderer krijgt alleen
 // gevalideerde modellen te zien.
 
-import { dakOnderY } from './model.js'
+import { dakOnderY, nokProfiel } from './model.js'
+import { STAELDETAILS } from './staeldetails.js'
 
 function inContour(punt, contour, marge = 0) {
   // even-odd test plus margecontrole tegen de bovenranden
@@ -77,6 +78,32 @@ export function valideerModel(model) {
     r.type + (r.kant != null ? ':' + r.kant : r.richting != null ? ':' + r.richting : ''))
   for (const n of nodig) {
     if (!aanwezig.includes(n)) fouten.push('dakrand niet afgewerkt: ' + n)
+  }
+
+  // 5. de nok: precies een doorlopende gevouwen afdekking waarvan de
+  // vouwlijn op het snijpunt van de plaatbovenvlakken ligt, en geen
+  // ander randelement dat tot boven de vouw reikt (stapeling)
+  const vouwen = model.randafwerking.filter(r => r.type === 'nokvouw')
+  if (vouwen.length !== 1) {
+    fouten.push('nok: precies een doorlopende vouwafdekking vereist, gevonden ' + vouwen.length)
+  } else {
+    const vouw = vouwen[0]
+    const her = nokProfiel(model.dakvlakken, STAELDETAILS.nok.vouwBreedte, STAELDETAILS.nok.dikte)
+    if (!vouw.profiel || vouw.profiel.length !== 6) {
+      fouten.push('nok: vouwprofiel ontbreekt of is onvolledig')
+    } else {
+      for (let i = 0; i < 6; i++) {
+        if (Math.hypot(vouw.profiel[i][0] - her[i][0], vouw.profiel[i][1] - her[i][1]) > .001) {
+          fouten.push('nok: vouwlijn ligt niet op de snijlijn van de dakvlakken')
+          break
+        }
+      }
+    }
+  }
+  for (const r of model.randafwerking) {
+    if ((r.type === 'boeikop' || r.type === 'windveer')
+      && (r.nokTrim ?? 0) < STAELDETAILS.nok.vouwBreedte - .01)
+      fouten.push(r.type + ' reikt tot boven de nokvouw (stapeling op de noklijn)')
   }
 
   return fouten

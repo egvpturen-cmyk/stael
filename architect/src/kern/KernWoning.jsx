@@ -152,19 +152,15 @@ function Randafwerking({ rand, model }) {
   const diepte = vol.d + 2 * vol.overstekKop
 
   if (rand.type === 'nokvouw') {
-    // gevouwen afdekking die uit de dakvlakken zelf volgt: per vlak een
-    // strook op de plaat, met kleine overlap over de noklijn
-    return model.dakvlakken.map(vlak => {
-      const { nu, nv, ux, uy, nx, ny, hoek } = vlakMaat(vlak)
-      const bR = .3 + .05 // vouwbreedte plus overlap, langs de helling
-      const cx = nu + ux * (bR / 2 - .05) + nx * (vlak.dikte + .015)
-      const cy = nv + uy * (bR / 2 - .05) + ny * (vlak.dikte + .015)
-      return (
-        <mesh key={vlak.id} material={dak} position={[cx, cy, 0]} rotation={[0, 0, hoek]}>
-          <boxGeometry args={[bR, .03, diepte]} />
-        </mesh>
-      )
-    })
+    // een doorlopend knikprofiel: de vouwlijn ligt exact op de noklijn,
+    // de flanken sluiten strak op beide plaatbovenvlakken aan.
+    // Het profiel komt kant-en-klaar uit het model.
+    const s = new THREE.Shape()
+    rand.profiel.forEach(([x, y], i) => i === 0 ? s.moveTo(x, y) : s.lineTo(x, y))
+    s.closePath()
+    const geo = new THREE.ExtrudeGeometry(s, { depth: rand.diepte, bevelEnabled: false })
+    geo.translate(0, 0, -rand.diepte / 2)
+    return <mesh geometry={geo} material={dak} />
   }
   if (rand.type === 'boeideel') {
     // strak: de gevel loopt als boeideel door tot boven de dakrand,
@@ -173,23 +169,25 @@ function Randafwerking({ rand, model }) {
     const dikV = vlak.dikte / Math.cos(Math.atan2(vol.nok - vol.goot, vol.b / 2 - Math.abs(vol.nokOffset)))
     const h = dikV + .12
     return (
-      <mesh material={gevelM} position={[rand.kant * (vol.b / 2 - .02), vol.goot + h / 2 - .01, 0]}>
+      <mesh material={gevelM} position={[rand.kant * (vol.b / 2 + .005), vol.goot + h / 2 - .01, 0]}>
         <boxGeometry args={[.04, h, vol.d]} />
       </mesh>
     )
   }
   if (rand.type === 'boeikop') {
-    // strak: dun doorlopend boeideel langs de daklijn van de kopgevel,
-    // tot exact in de nokvouw
+    // strak: dun doorlopend boeideel langs de daklijn van de kopgevel;
+    // bij de nok ingekort met de vouwbreedte zodat hij exact tot in de
+    // vouw loopt in plaats van erbovenuit te kruisen
     return model.dakvlakken.map(vlak => {
       const { nu, nv, ux, uy, nx, ny, n0, hoek } = vlakMaat(vlak)
-      const len = n0 - vlak.inzetLangs + .02
+      const trim = rand.nokTrim ?? 0
+      const len = n0 - vlak.inzetLangs - trim + .04
       const h = vlak.dikte + .12
-      const cx = nu + ux * (len / 2) + nx * (vlak.dikte / 2 + .01)
-      const cy = nv + uy * (len / 2) + ny * (vlak.dikte / 2 + .01)
+      const cx = nu + ux * (trim + len / 2 - .04) + nx * (vlak.dikte / 2 + .01)
+      const cy = nv + uy * (trim + len / 2 - .04) + ny * (vlak.dikte / 2 + .01)
       return (
         <mesh key={vlak.id} material={gevelM}
-          position={[cx, cy, rand.richting * (vol.d / 2 - .02)]}
+          position={[cx, cy, rand.richting * (vol.d / 2 + .005)]}
           rotation={[0, 0, hoek]}>
           <boxGeometry args={[len, h, .04]} />
         </mesh>
@@ -209,12 +207,14 @@ function Randafwerking({ rand, model }) {
     )
   }
   if (rand.type === 'windveer') {
-    // kolossaal: slanke windveer langs de daklijn op de koprand
+    // kolossaal: slanke windveer langs de daklijn op de koprand,
+    // bij de nok ingekort tot in de vouw
     return model.dakvlakken.map(vlak => {
       const { nu, nv, ux, uy, nx, ny, n0, hoek } = vlakMaat(vlak)
-      const len = n0 - vlak.inzetLangs + vlak.overstekLangs
-      const cx = nu + ux * (len / 2) + nx * (vlak.dikte / 2)
-      const cy = nv + uy * (len / 2) + ny * (vlak.dikte / 2)
+      const trim = rand.nokTrim ?? 0
+      const len = n0 - vlak.inzetLangs + vlak.overstekLangs - trim + .04
+      const cx = nu + ux * (trim + len / 2 - .04) + nx * (vlak.dikte / 2)
+      const cy = nv + uy * (trim + len / 2 - .04) + ny * (vlak.dikte / 2)
       return (
         <mesh key={vlak.id} material={kozijn}
           position={[cx, cy, rand.richting * (vol.d / 2 + vlak.overstekKop - .025)]}

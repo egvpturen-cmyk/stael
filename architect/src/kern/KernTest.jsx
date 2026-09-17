@@ -51,7 +51,9 @@ export default function KernTest() {
 
   const strakZichten = [
     { naam: 'totaal', camera: { pos: [13, 6, 15], doel: [0, 2.6, 0] } },
-    { naam: 'nok', camera: { pos: [2.5, vol.nok + 1.2, vol.d / 2 + 3.5], doel: [0, vol.nok - .3, vol.d / 2 - 1], fov: 35 } },
+    { naam: 'nok voor', camera: { pos: [2.5, vol.nok + 1.2, vol.d / 2 + 3.5], doel: [0, vol.nok - .3, vol.d / 2 - 1], fov: 35 } },
+    { naam: 'nok zij', camera: { pos: [10, vol.nok + 3.5, 0], doel: [0, vol.nok - .6, 0], fov: 35 } },
+    { naam: 'nok schuin achter', camera: { pos: [-4.5, vol.nok + 2.6, -vol.d / 2 - 4.5], doel: [0, vol.nok - .5, -vol.d / 2 + 2], fov: 35 } },
     { naam: 'dakrand', camera: { pos: [vol.b / 2 + 3, vol.goot + 1.8, vol.d / 2 - 1], doel: [vol.b / 2 - .2, vol.goot + .1, vol.d / 2 - 3.5], fov: 35 } },
     { naam: 'gevelhoek', camera: { pos: [vol.b / 2 + 2.6, 1.8, vol.d / 2 + 2.6], doel: [vol.b / 2 - .3, 1.3, vol.d / 2 - .3], fov: 35 } },
   ]
