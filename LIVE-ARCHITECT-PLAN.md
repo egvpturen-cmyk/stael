@@ -98,6 +98,10 @@ Het gebouwmodel (src/kern/) kent deze elementen en relaties:
 - Gevel-elementen: lamellenvelden, penanten, kaders, panelen en balkons horen bij een gastvlak en worden daar exact op geclipt.
 - Randafwerking: nokvorst, windveren, boeidelen, goten en (bij kruisende kappen) een kilkeper worden automatisch langs de dakranden gegenereerd, zodat elke dakrand per constructie gesloten is.
 
+De kopgevel is een eigen elementtype: een wand waarvan de vorm de volledige dakcontour volgt (driehoek, of vijfhoek bij een verschoven nok, inclusief dakdikte-aftrek). Alle elementen in die gevel (pui, kader, lamellenveld, penanten, balkon) hebben de kopgevel als gastvlak en worden tegen die contour gevalideerd en geclipt. Dit is de gevel waar tot nu toe de meeste fouten zaten en verdient daarom een eigen, expliciet behandeld geval.
+
+Determinisme is een harde eis: elk model is volledig reproduceerbaar uit zijn parameterset plus seed. Dezelfde invoer geeft exact hetzelfde huis, altijd, zodat de kalibratiepresets en opgeslagen klantontwerpen betrouwbare regressietests zijn. In de kern staat geen enkele Math.random zonder seed.
+
 Modelvalidatie draait VOORDAT er geometrie bestaat: sparingen overlappen elkaar niet en liggen volledig binnen hun gastwand; bekleding nooit over een sparing; elk gevel-element binnen zijn gastvlak of exact geclipt; alle dakranden gesloten; geen element dat een dakvlak doorsnijdt. Een model dat faalt wordt gerepareerd of verworpen; de renderer tekent alleen nog wat het model zegt en rekent zelf niets meer uit.
 
 Migratie, naast de oude kern, typologie voor typologie:
