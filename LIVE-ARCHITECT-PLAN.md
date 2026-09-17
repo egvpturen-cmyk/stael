@@ -83,7 +83,34 @@ Groeipad in twee stappen:
 - De AI-renderproxy van fase 4 wordt een endpoint op de Railway-API (zie 2.4), geen aparte serverless functie; zo liggen alle sleutels op één plek.
 - Domein: stael.nl is bezet, het wordt waarschijnlijk staelhome.nl. De app komt dan op architect.staelhome.nl; e-mail wordt info@staelhome.nl.
 
-### 2.7 Later: richting BIM
+### 2.7 De gebouwmodel-kern (BIM-denkwijze)
+
+Besloten na de kalibratieronde: de generator plaatste losse meshes met formules, zonder gebouwmodel, en dat is de ene oorzaak achter de hele foutenfamilie (niet-sluitende daken en gevels, prikkende lamellen en spanten, open nokken en goten, kozijnen door elkaar). De kern wordt herbouwd volgens de BIM-denkwijze: eerst een gebouwmodel met elementen en relaties, daarna pas de 3D-geometrie afleiden.
+
+De pijplijn wordt: parameters -> bouwModel -> valideerModel (repareren of verwerpen) -> modelNaarGeometrie -> dom tekenen.
+
+Het gebouwmodel (src/kern/) kent deze elementen en relaties:
+- Bouwvolumes: rechthoekige voetafdruk plus dakdefinitie (vorm, hellingshoek, nokrichting en -verschuiving, dakdikte, overstek per rand). Meerdere volumes vormen samengestelde massa's.
+- Dakvlakken: per volume afgeleid als vlakken met dikte, hellingshoek en overstek. Overstek is een eigenschap van het dakvlak, bescheiden (default 300 tot 600 mm), nooit een los uitstekend blok.
+- Wanden per gevel: afgeleid uit voetafdruk plus dakvlakken. De bovenrand van een wand IS de onderzijde van het dakpakket, per definitie, dus een wand kan nooit boven of onder het dak uitkomen.
+- Sparingen: kozijnen, puien en deuren zijn openingen IN een gastwand (host-relatie), met een vulling (kozijnprofiel, stramien, glas met negge). Ze worden als echte boolean-operatie uit de wand gesneden (three-bvh-csg), niet als vlak ervoor geplakt.
+- Bekleding: gegenereerd OP een wandvlak en automatisch uitgespaard rond de sparingen van die wand.
+- Gevel-elementen: lamellenvelden, penanten, kaders, panelen en balkons horen bij een gastvlak en worden daar exact op geclipt.
+- Randafwerking: nokvorst, windveren, boeidelen, goten en (bij kruisende kappen) een kilkeper worden automatisch langs de dakranden gegenereerd, zodat elke dakrand per constructie gesloten is.
+
+Modelvalidatie draait VOORDAT er geometrie bestaat: sparingen overlappen elkaar niet en liggen volledig binnen hun gastwand; bekleding nooit over een sparing; elk gevel-element binnen zijn gastvlak of exact geclipt; alle dakranden gesloten; geen element dat een dakvlak doorsnijdt. Een model dat faalt wordt gerepareerd of verworpen; de renderer tekent alleen nog wat het model zegt en rekent zelf niets meer uit.
+
+Migratie, naast de oude kern, typologie voor typologie:
+1. Simpelste geval: rechthoekige schuurwoning, zadeldak, een pui in de kopgevel, raamstroken in de langsgevels.
+2. Gevel-elementen: kader, penanten, lamellenveld, panelen, plint, balkon.
+3. Samengestelde massa's: kop-en-staart, dwarskap met kilkeper, asymmetrische kap, veranda en portaal en zijluifel als dakvlak-verlengingen, geschakelde aanbouw.
+4. Platte volumes en de stapelmassa (glasbanden, dakopbouw, pergola, balustrade).
+5. Alle 13 kalibratiepresets over op de nieuwe kern; de kalibratiepagina is de regressietest, en de klantgenerator schakelt om.
+6. Pas daarna wordt de oude meshcode verwijderd.
+
+Voortgang wordt per typologie gemeld. Visuele franje wacht: correcte aansluitingen eerst, mooi maken is fase 2.
+
+### 2.8 Later: richting BIM
 
 Omdat het ontwerp een parameterset is, kan er een exporter bij die IFC (of eerst een eenvoudiger tussenformaat) genereert voor de BIM-workflow van EG Assembly (Solibri-controle). Dit staat bewust achteraan; het beïnvloedt nu alleen de keuze om alles parametrisch en gestructureerd op te slaan.
 
