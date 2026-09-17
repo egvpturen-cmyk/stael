@@ -378,6 +378,16 @@ export function valideerModel(model, opties = {}) {
       .some(w => w.sparingen.some(sp => sp.rect && sp.rect.w >= .8 && sp.rect.h >= 1.85
         && sp.rect.v >= niveau - .02 && sp.rect.v <= niveau + .2)))
     if (!toegang) fouten.push(vol.id + ': dakterras zonder toegang op terrasniveau')
+    // een terras bestaat alleen bij een begaanbare inzet van minstens
+    // 1,2 m; smallere restranden zijn plat dak, geen terras
+    if (occ.length) {
+      const R2 = rectVan(vol)
+      const maxInzet = Math.max(...occ.map(o => {
+        const r = rectVan(o)
+        return Math.max(r.x0 - R2.x0, R2.x1 - r.x1, r.z0 - R2.z0, R2.z1 - r.z1)
+      }))
+      if (maxInzet < 1.15) fouten.push(vol.id + ': dakterras zonder begaanbare inzet van minstens 1,2 m')
+    }
   }
   for (const vol of model.volumes.filter(v => v.rol === 'opbouw')) {
     const drager = model.volumes.find(o => Math.abs(o.goot + o.dakDikte - (vol.basis || 0)) < .05)

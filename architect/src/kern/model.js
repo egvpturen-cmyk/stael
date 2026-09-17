@@ -467,13 +467,14 @@ export function bouwModel(p) {
         })
       }
     }
-    // onderdak begaanbaar: alleen als er een terraszijde met diepte is,
-    // met een deur op terrasniveau; anders geen terras en geen hek
+    // onderdak begaanbaar: alleen bij een begaanbare inzet van minstens
+    // 1,2 m, met een deur op terrasniveau; een kleinere inzet is een
+    // plat dak zonder balustrade en zonder deur
     if (m.terras !== false) {
       const kandidaten = [
         ['boven:langs-', rBoven.x0 - rOnder.x0], ['boven:langs+', rOnder.x1 - rBoven.x1],
         ['boven:kop-', rBoven.z0 - rOnder.z0], ['boven:kop+', rOnder.z1 - rBoven.z1],
-      ].filter(k => k[1] >= 1.05).sort((a, b) => b[1] - a[1])
+      ].filter(k => k[1] >= 1.2).sort((a, b) => b[1] - a[1])
       if (kandidaten.length) {
         const dw = wand(kandidaten[0][0])
         dw.sparingen.push({

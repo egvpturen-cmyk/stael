@@ -25,6 +25,13 @@ const cases = [
   ['opbouw zonder terras eronder', m => { m.volumes.find(v => v.id === 'boven').terras = false }],
   ['balustrade op niet-begaanbaar dak', m => { m.volumes.find(v => v.id === 'onder').terras = false }],
   ['balustrade te laag', m => { m.randafwerking.find(r => r.type === 'balustrade').h = .6 }],
+  ['terras met te smalle inzet (regel 1,2 m)', m => {
+    // verklein alle inzetten door de bovendoos op te blazen tot bijna
+    // de onderdoos: het terras had dan nooit mogen bestaan
+    const boven = m.volumes.find(v => v.id === 'boven')
+    const onder = m.volumes.find(v => v.id === 'onder')
+    boven.b = onder.b - .7; boven.d = onder.d - .7; boven.pos = [0, 0]
+  }, 'begaanbare inzet'],
   ['bovenwand begint te hoog (open strook, basis-schilcheck)', m => {
     const w = m.wanden.find(x => x.id === 'boven:langs-')
     const basis = m.volumes.find(v => v.id === 'boven').basis
@@ -33,13 +40,14 @@ const cases = [
 ]
 
 let mis = 0
-for (const [naam, saboteer] of cases) {
+for (const [naam, saboteer, verwacht] of cases) {
   const model = bouwModel(params)
   const basis = valideerModel(model)
   if (basis.length) { console.log('BASIS NIET GROEN:', basis.slice(0, 3)); mis++; continue }
   saboteer(model)
   const fouten = valideerModel(model)
-  if (fouten.length) console.log('rood zoals verwacht |', naam, '|', fouten[0])
-  else { console.log('!! BLEEF GROEN:', naam); mis++ }
+  const raak = verwacht ? fouten.some(f => f.includes(verwacht)) : fouten.length > 0
+  if (raak) console.log('rood zoals verwacht |', naam, '|', fouten.find(f => !verwacht || f.includes(verwacht)))
+  else { console.log('!! WET VUURDE NIET:', naam, fouten.slice(0, 2)); mis++ }
 }
 console.log(mis ? 'FAAL: ' + mis + ' cases' : 'alle sabotages rood: wetten bijten')
