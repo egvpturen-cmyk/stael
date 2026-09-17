@@ -116,6 +116,8 @@ Migratie, naast de oude kern, typologie voor typologie:
 
 Voortgang wordt per typologie gemeld. Visuele franje wacht: correcte aansluitingen eerst, mooi maken is fase 2.
 
+De kwaliteitslat, door STAEL vastgesteld: de 3D-kern legt de VORM vast en moet daarin correct en compleet zijn (massa's, dakvormen, plaats van ramen, deuren, entree, garage en balkon, alles maatvast, bereikbaar en bouwkundig kloppend volgens de wetten: gesloten schil, element-afheid, logische einden, functionele elementen). De kern hoeft niet verkoop-mooi te zijn; detailperfectie voorbij "correct" wordt er niet meer in gebouwd. Het mooi maken gebeurt in twee lagen: fase 2 (materialen en licht) brengt het draaibare model op archviz-preview-niveau, en fase 4 (AI-fotostand) levert de verleidelijke beelden per gekozen camerastandpunt. Nieuwe kern-issues tellen alleen nog als ze de wetten schenden.
+
 ### 2.8 Later: richting BIM
 
 Omdat het ontwerp een parameterset is, kan er een exporter bij die IFC (of eerst een eenvoudiger tussenformaat) genereert voor de BIM-workflow van EG Assembly (Solibri-controle). Dit staat bewust achteraan; het beïnvloedt nu alleen de keuze om alles parametrisch en gestructureerd op te slaan.
@@ -154,6 +156,7 @@ Elke fase levert iets werkends op dat aan klanten te laten zien is.
 - AI-renderlaag: per variant en camerahoek een fotorealistisch beeld, gestuurd door het 3D-model. Kwaliteit gaat boven kosten; voorkeur voor de beeldgeneratie van OpenAI (gpt-image), met zo nodig een kwaliteitsvergelijking tussen een paar aanbieders waarna de beste wint.
 - Renderproxy als endpoint op de Railway-API (sleutels nooit in de browser), met een maandelijks kostenrapportje; geen krappe limiet die de kwaliteit drukt.
 - Bewaking dat er geen AI-tekstfouten in beeld komen (geen verzonnen opschriften of naambordjes).
+- Experiment AI-turntable: een automatische ring van circa 12 gezichtspunten rond de woning waar de klant doorheen draait als rondkijk-ervaring; het onderzoekspunt is de consistentie tussen de beelden.
 - Demonstreerbaar: knop "maak er een foto van" naast het interactieve model.
 
 ### Fase 5: echt samen kijken
