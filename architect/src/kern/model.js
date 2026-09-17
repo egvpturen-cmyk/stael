@@ -892,5 +892,21 @@ export function bouwModel(p) {
     kozijn: p.kleuren?.kozijn || '#1b1b1e',
     glas: p.kleuren?.glas || '#4c5c6b',
   }
+
+  // materialen (fase 2): per gevelvlak/volume, dak, daklijnen en accent;
+  // een kale kleurenset uit oudere parameters wordt een tint op de
+  // standaardmaterialen, zodat elk model materialen heeft
+  const matIn = p.materialen || {}
+  model.materialen = {
+    gevels: {
+      standaard: matIn.gevel
+        || (p.kleuren?.gevel ? { mat: 'houtVerticaal', hex: p.kleuren.gevel } : { mat: 'houtVerticaal', kleur: 'warmbruin' }),
+      ...(matIn.gevels || {}),
+    },
+    dak: matIn.dak
+      || (p.kleuren?.dak ? { mat: 'felsDak', hex: p.kleuren.dak } : { mat: 'felsDak', kleur: 'antraciet' }),
+    daklijnen: matIn.daklijnen || null,
+    accent: matIn.accent || { mat: 'houtAccent', kleur: 'blank' },
+  }
   return model
 }

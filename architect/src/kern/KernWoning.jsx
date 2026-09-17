@@ -1,27 +1,153 @@
 import * as THREE from 'three'
 import { useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, Environment } from '@react-three/drei'
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg'
 import { leidGeometrieAf } from './afleiding.js'
+import { MATERIALEN, materiaalKleur, KOZIJN } from './materialen.js'
 
 const csg = new Evaluator()
+const BASIS_URL = './materialen/'
 
 // Domme renderer: tekent uitsluitend de primitieven die uit de gedeelde
 // geometrie-afleiding komen. De gesloten-schil-validatie sampelt tegen
 // exact dezelfde lijst, dus wat hier staat is wat gecontroleerd is.
+// Fase 2: PBR-materialen uit de bibliotheek (materialen.js), HDRI-licht
+// met zachte schaduwen; de geometrie zelf is ongewijzigd.
 
+// ---- texturen: gedeeld beeld, eigen herhaal/rotatie per materiaal ----
+const texCache = new Map()
+function laadTex(url, srgb) {
+  const key = url + (srgb ? '|s' : '')
+  if (!texCache.has(key)) {
+    const t = new THREE.TextureLoader().load(url)
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace
+    t.anisotropy = 4
+    texCache.set(key, t)
+  }
+  return texCache.get(key)
+}
+function tex(url, srgb, repeat, rotatie) {
+  const key = url + '|' + repeat.join(',') + '|' + (rotatie ? 1 : 0) + (srgb ? '|s' : '')
+  if (!texCache.has(key)) {
+    const t = laadTex(url, srgb).clone()
+    t.repeat.set(repeat[0], repeat[1])
+    if (rotatie) { t.rotation = Math.PI / 2; t.center.set(.5, .5) }
+    t.needsUpdate = true
+    texCache.set(key, t)
+  }
+  return texCache.get(key)
+}
+
+// procedurele naad-normalmaps: staande felsnaad en rabatgroef, met
+// exacte hartafstand in meters; as 'x' voor gevels (verticale naden),
+// 'y' voor dakvlakken (naden in de hellingrichting)
+function naadTex(soort, as, afstand) {
+  const key = 'naad|' + soort + '|' + as + '|' + afstand
+  if (!texCache.has(key)) {
+    const B = 256, H = 4
+    const d = new Uint8Array(B * H * 4)
+    for (let y = 0; y < H; y++) for (let x = 0; x < B; x++) {
+      let n = 128
+      if (soort === 'fels') {
+        if (x < 3) n = 208
+        else if (x < 6) n = 48
+        else if (x < 8) n = 150
+      } else {
+        if (x < 3) n = 38
+        else if (x < 6) n = 218
+        else n = 128 + Math.round(9 * Math.sin(x * 1.7) * Math.cos(x * .31))
+      }
+      const i = (y * B + x) * 4
+      d[i] = as === 'x' ? n : 128
+      d[i + 1] = as === 'x' ? 128 : n
+      d[i + 2] = 255
+      d[i + 3] = 255
+    }
+    let t = new THREE.DataTexture(d, B, H)
+    if (as === 'y') {
+      // variatie moet in v lopen: zet de data om naar een staande strook
+      const d2 = new Uint8Array(H * B * 4)
+      for (let y = 0; y < B; y++) for (let x = 0; x < H; x++) {
+        const bron = (0 * B + y) * 4, doel = (y * H + x) * 4
+        d2[doel] = 128; d2[doel + 1] = d[bron]; d2[doel + 2] = 255; d2[doel + 3] = 255
+      }
+      t = new THREE.DataTexture(d2, H, B)
+    }
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.needsUpdate = true
+    t.repeat.set(as === 'x' ? 1 / afstand : 1, as === 'x' ? 1 : 1 / afstand)
+    texCache.set(key, t)
+  }
+  return texCache.get(key)
+}
+
+// ---- materialen ----
 const matCache = new Map()
-function matVoor(kleur, rol) {
-  const sleutel = kleur + '|' + rol
+function bibMat(m, rol) {
+  const def = MATERIALEN[m.mat]
+  if (!def) return null
+  const hex = m.hex || materiaalKleur(m.mat, m.kleur) || '#999999'
+  const key = m.mat + '|' + hex
+  if (matCache.has(key)) return matCache.get(key)
+  const mat = new THREE.MeshStandardMaterial({
+    color: hex,
+    metalness: def.metalness ?? 0,
+    roughness: def.ruwte ?? def.roughness ?? 1,
+  })
+  if (def.dir) {
+    const rep = [1 / def.tegel[0], 1 / def.tegel[1]]
+    if (def.kleurmap) mat.map = tex(BASIS_URL + def.dir + '/color.jpg', true, rep, def.rotatie)
+    mat.roughnessMap = tex(BASIS_URL + def.dir + '/roughness.jpg', false, rep, def.rotatie)
+    if (!def.felsNaad && !def.rabatNaad) {
+      mat.normalMap = tex(BASIS_URL + def.dir + '/normal.jpg', false, rep, def.rotatie)
+      mat.normalScale = new THREE.Vector2(.8, .8)
+    }
+  }
+  if (def.felsNaad) {
+    mat.normalMap = naadTex('fels', def.cat === 'dak' ? 'y' : 'x', def.felsNaad)
+    mat.normalScale = new THREE.Vector2(.75, .75)
+  }
+  if (def.rabatNaad) {
+    mat.normalMap = naadTex('rabat', 'x', def.rabatNaad)
+    mat.normalScale = new THREE.Vector2(.55, .55)
+  }
+  matCache.set(key, mat)
+  return mat
+}
+function basisMat(kleur, rol) {
+  const sleutel = 'basis|' + kleur + '|' + rol
   if (!matCache.has(sleutel)) {
-    const eig = rol === 'glas' ? { roughness: .14, metalness: .08 }
-      : rol === 'dak' || rol === 'nokvouw' ? { roughness: .6, metalness: .1 }
-      : rol === 'kozijn' || rol === 'balkon' || rol === 'windveer' || rol === 'randprofiel' || rol === 'gording' || rol === 'balustrade' || rol === 'pergola' || rol === 'kolom' ? { roughness: .5, metalness: .2 }
-      : { roughness: .85, metalness: 0 }
+    const eig = rol === 'glas' ? { roughness: .07, metalness: .45, envMapIntensity: 1.25 }
+      : ['kozijn', 'balkon', 'windveer', 'randprofiel', 'gording', 'balustrade', 'pergola', 'kolom'].includes(rol)
+        ? { roughness: KOZIJN.roughness, metalness: KOZIJN.metalness }
+        : rol === 'dak' || rol === 'nokvouw' ? { roughness: .6, metalness: .1 }
+        : { roughness: .85, metalness: 0 }
     matCache.set(sleutel, new THREE.MeshStandardMaterial({ color: kleur, ...eig }))
   }
   return matCache.get(sleutel)
+}
+function matVoor(prim) {
+  if (prim.mat) {
+    const m = bibMat(prim.mat, prim.rol)
+    if (m) return m
+  }
+  return basisMat(prim.kleur, prim.rol)
+}
+
+// box met UV's in meters, zodat texturen wereldvast herhalen
+function boxGeoWereldUV(size) {
+  const g = new THREE.BoxGeometry(...size)
+  const uv = g.attributes.uv
+  const paren = [[2, 1], [2, 1], [0, 2], [0, 2], [0, 1], [0, 1]]
+  for (let f = 0; f < 6; f++) {
+    const [ua, va] = paren[f]
+    for (let i = f * 4; i < f * 4 + 4; i++) {
+      uv.setXY(i, uv.getX(i) * size[ua], uv.getY(i) * size[va])
+    }
+  }
+  return g
 }
 
 function Prim({ prim }) {
@@ -30,7 +156,7 @@ function Prim({ prim }) {
   const { geo, wereldvast } = useMemo(() => {
     let g
     if (prim.vorm === 'box') {
-      g = new THREE.BoxGeometry(...prim.size)
+      g = boxGeoWereldUV(prim.size)
     } else {
       const s = new THREE.Shape()
       prim.contour.forEach(([u, v], i) => i === 0 ? s.moveTo(u, v) : s.lineTo(u, v))
@@ -63,39 +189,47 @@ function Prim({ prim }) {
     }
     return { geo: brush.geometry, wereldvast: true }
   }, [prim]) // eslint-disable-line react-hooks/exhaustive-deps
-  const m = matVoor(prim.kleur, prim.rol)
-  if (wereldvast) return <mesh material={m} geometry={geo} />
+  const m = matVoor(prim)
+  if (wereldvast) return <mesh material={m} geometry={geo} castShadow receiveShadow />
   return (
-    <mesh material={m} geometry={geo} position={prim.pos}
+    <mesh material={m} geometry={geo} position={prim.pos} castShadow receiveShadow
       rotation={new THREE.Euler(rot[0], rot[1], rot[2], 'YZX')} />
   )
 }
 
 export function KernGebouw({ model }) {
   const prims = useMemo(() => leidGeometrieAf(model), [model])
-  const gras = useMemo(() => new THREE.MeshStandardMaterial({ color: '#3a4630', roughness: 1 }), [])
   const vol = model.volumes[0]
+  const straal = Math.max(...model.volumes.map(v => Math.max(v.b, v.d))) * 1.6 + 6
+  const gras = useMemo(() => {
+    const m = bibMat({ mat: 'gras', kleur: 'gras' }, 'terrein')
+    return m || basisMat('#3a4630', 'terrein')
+  }, [])
   return (
     <group>
       {prims.map((p, i) => <Prim key={i} prim={p} />)}
-      <mesh material={gras} rotation={[-Math.PI / 2, 0, 0]} position={[0, -.01, 0]}>
-        <circleGeometry args={[Math.max(vol.b, vol.d) * 1.4, 48]} />
+      <mesh material={gras} rotation={[-Math.PI / 2, 0, 0]} position={[0, -.01, 0]} receiveShadow>
+        <circleGeometry args={[straal, 56]} />
       </mesh>
     </group>
   )
 }
 
 export default function KernCanvas({ model, camera }) {
+  const maat = Math.max(...model.volumes.map(v => Math.max(v.b, v.d))) + 8
   return (
-    <Canvas dpr={[1, 1.75]} camera={{ position: camera.pos, fov: camera.fov ?? 40 }}
-      gl={{ antialias: true, preserveDrawingBuffer: true }}>
-      <color attach="background" args={['#1a1a1d']} />
-      <ambientLight intensity={.35} color="#e8e4dc" />
-      <hemisphereLight args={['#d8dde6', '#4a4438', 1.2]} />
-      <directionalLight position={[14, 18, 9]} intensity={2.6} color="#ffe8d2" />
-      <directionalLight position={[-10, 6, -8]} intensity={.8} color="#9fb2c8" />
+    <Canvas shadows dpr={[1, 1.75]} camera={{ position: camera.pos, fov: camera.fov ?? 40 }}
+      gl={{ antialias: true, preserveDrawingBuffer: true }}
+      onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = .85 }}>
+      <Environment files="./omgeving/lucht.hdr" background backgroundBlurriness={.04} />
+      <directionalLight castShadow position={[14, 20, 10]} intensity={2.4} color="#fff2df"
+        shadow-mapSize-width={2048} shadow-mapSize-height={2048}
+        shadow-radius={5} shadow-bias={-0.0004} shadow-normalBias={.02}
+        shadow-camera-left={-maat} shadow-camera-right={maat}
+        shadow-camera-top={maat} shadow-camera-bottom={-maat}
+        shadow-camera-near={1} shadow-camera-far={60} />
       <KernGebouw model={model} />
-      <OrbitControls target={camera.doel} enablePan={false} />
+      <OrbitControls target={camera.doel} enablePan={false} maxPolarAngle={Math.PI * .52} />
     </Canvas>
   )
 }

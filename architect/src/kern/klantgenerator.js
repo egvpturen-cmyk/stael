@@ -7,8 +7,9 @@
 
 import { kernRng, bouwModel } from './model.js'
 import { valideerModel, repareerModel } from './valideer.js'
+import { MATERIAALPRESETS, materiaalKleur } from './materialen.js'
 import {
-  STAEL, KLEUREN, MASSAS, STRAMIENEN, KOPTHEMAS, SECUNDAIR, typologieenVoor,
+  STAEL, KLEUREN, MASSAS, STRAMIENEN, KOPTHEMAS, SECUNDAIR, TYPOLOGIEEN, typologieenVoor,
 } from '../ontwerptaal.js'
 
 const grad = g => g * Math.PI / 180
@@ -34,25 +35,41 @@ const MASSA_KAN = ['enkel', 'kopstaart', 'dwarskap', 'asym', 'stapel', 'zwevend'
 const KOPTHEMA_KAN = ['puiStrak', 'puiKader', 'puiLamellen', 'puiPenanten', 'portaal', 'lamellenVeld']
 const SECUNDAIR_KAN = ['balkon', 'veranda', 'zijLuifel', 'aanbouw', 'plint', 'pergola']
 
-export function genereerKernVarianten(prog, ronde = 0) {
+// het plan van een set: doelaantal plus de deterministische reeks
+// pogingen (typologie, massa, seed); los uitvoerbaar zodat een
+// workerpool de pogingen parallel kan bouwen met identieke uitkomst
+export function variantenPlan(prog, ronde = 0) {
   const basis = ronde * 7919 + 13
   const r = kernRng((basis + 1) * 2654435761)
   const kandidaten = typologieenVoor(prog.dak, prog.lagen)
-
   const pool = []
   kandidaten.forEach(t => t.massas.filter(m => MASSA_KAN.includes(m))
     .forEach(m => pool.push({ t, m })))
-  if (!pool.length) return []
+  if (!pool.length) return { doel: 0, pogingen: [] }
   const volgorde = schud(r, pool)
-
   const doel = 5 + Math.floor(r() * 3)
+  const pogingen = []
+  const maxPogingen = volgorde.length * 4 + 8
+  for (let poging = 0; poging < maxPogingen; poging++) {
+    const { t, m } = volgorde[poging % volgorde.length]
+    pogingen.push({ tId: t.id, m, seed: basis + poging * 31 + poging * 7 })
+  }
+  return { doel, pogingen }
+}
+
+export function maakVariantUitPoging(prog, poging) {
+  const t = TYPOLOGIEEN.find(x => x.id === poging.tId)
+  if (!t) return null
+  return maakKernVariant(t, poging.m, prog, poging.seed)
+}
+
+export function genereerKernVarianten(prog, ronde = 0) {
+  const { doel, pogingen } = variantenPlan(prog, ronde)
   const lijst = []
-  let i = 0, poging = 0
-  while (lijst.length < doel && poging < volgorde.length * 4 + 8) {
-    const { t, m } = volgorde[i % volgorde.length]
-    const v = maakKernVariant(t, m, prog, basis + poging * 31 + i * 7)
+  for (const poging of pogingen) {
+    if (lijst.length >= doel) break
+    const v = maakVariantUitPoging(prog, poging)
     if (v) lijst.push(v)
-    i++; poging++
   }
   return lijst
 }
@@ -93,8 +110,11 @@ function maakKernVariant(t, massaWens, prog, seed) {
     }
   }
 
-  const gevel = KLEUREN[kies(r, t.gevels)]
-  const dakKleur = KLEUREN[kies(r, t.daken)]
+  // materiaalpreset uit de bibliotheek: gevel, dak, accent als geheel
+  const preset = MATERIAALPRESETS[Math.floor(r() * MATERIAALPRESETS.length) % MATERIAALPRESETS.length]
+  const gevel = materiaalKleur(preset.gevel.mat, preset.gevel.kleur) || KLEUREN[kies(r, t.gevels)]
+  const dakKleur = materiaalKleur(preset.dak.mat, preset.dak.kleur) || KLEUREN[kies(r, t.daken)]
+  const accentHex = materiaalKleur(preset.accent.mat, preset.accent.kleur) || KLEUREN.houtBlank
   const stramien = kies(r, Object.keys(STRAMIENEN))
   const zinnen = []
 
@@ -111,6 +131,11 @@ function maakKernVariant(t, massaWens, prog, seed) {
     raamRitme: { n: Math.max(2, Math.round(d / 2.6)), w: .9, plint: .3 },
     gevelElementen: [],
     kleuren: { gevel, dak: dakKleur },
+    materialen: {
+      gevel: preset.gevel, dak: preset.dak,
+      daklijnen: preset.daklijnen || null, accent: preset.accent,
+    },
+    materiaalPreset: preset.id,
   }
 
   if (massa === 'kopstaart') {
@@ -163,6 +188,10 @@ function maakKernVariant(t, massaWens, prog, seed) {
       if (r() < .35) params.massa.opbouw = { b: 2.2 + r() * 1, d: 2 + r() * .8, h: 2.5 + r() * .3 }
     }
   }
+  if (plat || massa === 'stapel' || massa === 'zwevend') {
+    params.materialen.dak = { mat: 'bitumen', kleur: 'zwart' }
+    params.materialen.daklijnen = null
+  }
   zinnen.push(MASSAS[massa].zin)
 
   // dominant kopgevel-thema (niet bij stapelmassa's: daar zijn de
@@ -173,10 +202,7 @@ function maakKernVariant(t, massaWens, prog, seed) {
       .map(([naam, def]) => [naam, def.gewicht])
     s.kopThema = kiesGewogen(r, kandidaten) || 'puiStrak'
     if (s.kopThema === 'puiKader') {
-      params.gevelElementen.push({
-        wand: 'kop+', type: 'kader',
-        kleur: donker(gevel) ? KLEUREN.houtBlank : KLEUREN.houtZwart,
-      })
+      params.gevelElementen.push({ wand: 'kop+', type: 'kader', kleur: accentHex })
     }
     if (s.kopThema === 'puiLamellen' && !plat) {
       params.gevelElementen.push({

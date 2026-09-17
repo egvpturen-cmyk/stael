@@ -61,6 +61,7 @@ export function leidGeometrieAf(model, opties = {}) {
   for (const wand of model.wanden) {
     const vol = volVan(wand.volumeId)
     const t = wandTransform(wand, vol)
+    const wandStart = prims.length
     prims.push({
       vorm: 'extrude', rol: 'wand', kleur: K.gevel,
       contour: wand.contour, holes: wand.sparingen.map(sparingPoly),
@@ -157,12 +158,14 @@ export function leidGeometrieAf(model, opties = {}) {
         }
       }
     }
+    for (let i = wandStart; i < prims.length; i++) prims[i].vid = wand.volumeId
   }
 
   // ---- dakvlakken ----
   for (const vlak of model.dakvlakken) {
     const vol = volVan(vlak.volumeId)
     const vry = vol.ry || 0
+    const vlakStart = prims.length
     if (vlak.plat) {
       prims.push({
         vorm: 'box', rol: 'dak', kleur: K.dak,
@@ -176,6 +179,7 @@ export function leidGeometrieAf(model, opties = {}) {
         pos: volNaarWereld(vol, 0, vol.basis + .05, 0), ry: vry, rz: 0,
         size: [vol.b + .02, .1, vol.d + .02],
       })
+      for (let i = vlakStart; i < prims.length; i++) prims[i].vid = vlak.volumeId
       continue
     }
     const { u, n, n0, nok } = vlakRichting(vlak)
@@ -202,12 +206,14 @@ export function leidGeometrieAf(model, opties = {}) {
         size: [.3, ey, 1.5],
       })
     }
+    for (let i = vlakStart; i < prims.length; i++) prims[i].vid = vlak.volumeId
   }
 
   // ---- randafwerking ----
   for (const rand of model.randafwerking) {
     const vol = volVan(rand.volumeId)
     const [px, pz] = vol.pos || [0, 0]
+    const randStart = prims.length
     const dikV = vol.plat ? vol.dakDikte
       : vol.dakDikte / Math.cos(Math.atan2(vol.nok - vol.goot, vol.b / 2 - Math.abs(vol.nokOffset)) || 0)
 
@@ -413,6 +419,34 @@ export function leidGeometrieAf(model, opties = {}) {
           }
         }
         prims.push({ vorm: 'box', rol: 'terras', kleur: '#6e685d', pos: [px, .02, pz + vol.d / 2 + diepte / 2 - .2], ry: 0, rz: 0, size: [vol.b - .4, .05, diepte + .5] })
+      }
+    }
+    for (let i = randStart; i < prims.length; i++) prims[i].vid = rand.volumeId
+  }
+
+  // ---- materialen per rol en volume (fase 2); de geometrie zelf en de
+  // schilvalidatie zijn hier blind voor ----
+  const M = model.materialen
+  if (M) {
+    const gevelVan = vid => M.gevels[vid] || M.gevels.standaard
+    const lijnen = M.daklijnen || M.dak
+    for (const pr of prims) {
+      if (pr.mat) continue
+      switch (pr.rol) {
+        case 'wand': case 'daklijst': case 'boeideel': case 'boeikop':
+        case 'vloer': case 'schijfwand':
+          pr.mat = gevelVan(pr.vid); break
+        case 'dak':
+          pr.mat = M.dak; break
+        case 'nokvouw': case 'kilkeper':
+          pr.mat = lijnen; break
+        case 'element': case 'bekleding':
+          pr.mat = { ...M.accent, hex: pr.kleur }; break
+        case 'portaal':
+          pr.mat = { mat: 'verfAccent', hex: pr.kleur }; break
+        case 'terras':
+          pr.mat = { mat: 'bestrating', kleur: 'grijs' }; break
+        default: break
       }
     }
   }

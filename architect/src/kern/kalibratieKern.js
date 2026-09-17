@@ -26,12 +26,13 @@ export const KALIBRATIE_KERN = [
       raamRitme: { n: 4, w: .9, plint: .3 },
       gevelElementen: [{ wand: 'kop+', type: 'kader', kleur: '#b09a72' }],
       kleuren: { gevel: '#31302c', dak: '#232327' },
+      materialen: { gevel: { mat: 'houtVerticaal', kleur: 'zwart' }, dak: { mat: 'felsDak', kleur: 'antraciet' }, accent: { mat: 'houtAccent', kleur: 'blank' } },
     },
   },
   {
     nr: 4, beeld: '4.png', status: 'review',
     naam: 'Dwarskap in blauwgrijs fels',
-    notitie: 'Dwarsnok net onder de hoofdnok, kilkeper in het dal. Materiaalwissel per volume volgt in fase 2.',
+    notitie: 'Dwarsnok net onder de hoofdnok, kilkeper in het dal; materiaalwissel per volume (stuc en fels).',
     camera: { pos: [14.1, 3.5, 15.6], doel: [0, 3.2, 0], fov: 40 },
     params: {
       seed: 4,
@@ -41,6 +42,12 @@ export const KALIBRATIE_KERN = [
       raamRitme: { n: 5, w: .85, plint: .3 },
       gevelElementen: [],
       kleuren: { gevel: '#b9b2a4', dak: '#3f4750' },
+      materialen: {
+        gevel: { mat: 'stuc', kleur: 'wit' },
+        gevels: { dwars: { mat: 'felsGevel', kleur: 'blauwgrijs' } },
+        dak: { mat: 'felsDak', kleur: 'blauwgrijs' },
+        accent: { mat: 'houtAccent', kleur: 'warm' },
+      },
     },
   },
   {
@@ -56,6 +63,7 @@ export const KALIBRATIE_KERN = [
       raamRitme: { n: 5, w: .9, plint: .3 },
       gevelElementen: [],
       kleuren: { gevel: '#6d6355', dak: '#232327' },
+      materialen: { gevel: { mat: 'houtVerticaal', kleur: 'grijs' }, dak: { mat: 'felsDak', kleur: 'antraciet' }, accent: { mat: 'houtAccent', kleur: 'zwart' } },
     },
   },
   {
@@ -74,6 +82,7 @@ export const KALIBRATIE_KERN = [
       ],
       uitbouw: { type: 'zijluifel', kant: -1, uit: 2.0, wandKleur: '#31302c' },
       kleuren: { gevel: '#77644c', dak: '#232327' },
+      materialen: { gevel: { mat: 'houtNaturel', kleur: 'goud' }, dak: { mat: 'felsDak', kleur: 'antraciet' }, accent: { mat: 'houtAccent', kleur: 'zwart' } },
     },
   },
   {
@@ -90,6 +99,7 @@ export const KALIBRATIE_KERN = [
         { wand: 'kop+', type: 'lamellenveld', grens: 'dakcontour', v0: 2.7, v1: 5.4, kleur: '#84705a' },
       ],
       kleuren: { gevel: '#26262a', dak: '#232327' },
+      materialen: { gevel: { mat: 'felsGevel', kleur: 'zwart' }, dak: { mat: 'felsDak', kleur: 'zwart' }, accent: { mat: 'houtAccent', kleur: 'warm' } },
     },
   },
   {
@@ -105,6 +115,7 @@ export const KALIBRATIE_KERN = [
       raamRitme: { n: 4, w: .9, plint: .3 },
       gevelElementen: [],
       kleuren: { gevel: '#d8d4c9', dak: '#d8d4c9' },
+      materialen: { gevel: { mat: 'stuc', kleur: 'wit' }, dak: { mat: 'felsDak', kleur: 'wit' }, accent: { mat: 'houtAccent', kleur: 'warm' } },
     },
   },
   {
@@ -122,6 +133,7 @@ export const KALIBRATIE_KERN = [
         { wand: 'kop+', type: 'lamellenveld', grens: 'dakcontour', v0: 3.6, v1: 5.1, kleur: '#84705a' },
       ],
       kleuren: { gevel: '#6d6355', dak: '#232327' },
+      materialen: { gevel: { mat: 'houtVerticaal', kleur: 'grijs' }, dak: { mat: 'felsDak', kleur: 'antraciet' }, accent: { mat: 'houtAccent', kleur: 'zwart' } },
     },
   },
   {
@@ -141,6 +153,7 @@ export const KALIBRATIE_KERN = [
       ],
       plint: { h: 3.0, kleur: '#b09a72' },
       kleuren: { gevel: '#31302c', dak: '#232327' },
+      materialen: { gevel: { mat: 'houtVerticaal', kleur: 'zwart' }, dak: { mat: 'felsDak', kleur: 'antraciet' }, accent: { mat: 'houtAccent', kleur: 'blank' } },
     },
   },
   {
@@ -157,6 +170,7 @@ export const KALIBRATIE_KERN = [
         { wand: 'kop+', type: 'lamellenveld', grens: 'pui', v0: 3.2, v1: 5.6, uit: .35, kleur: '#84705a' },
       ],
       kleuren: { gevel: '#26262a', dak: '#232327' },
+      materialen: { gevel: { mat: 'felsGevel', kleur: 'zwart' }, dak: { mat: 'bitumen', kleur: 'zwart' }, accent: { mat: 'houtAccent', kleur: 'warm' } },
     },
   },
   {
@@ -171,12 +185,13 @@ export const KALIBRATIE_KERN = [
       sparingen: [],
       gevelElementen: [],
       kleuren: { gevel: '#26262a', dak: '#232327' },
+      materialen: { gevel: { mat: 'felsGevel', kleur: 'zwart' }, dak: { mat: 'bitumen', kleur: 'zwart' }, accent: { mat: 'staalAccent', kleur: 'zwart' } },
     },
   },
   {
     nr: 10, beeld: '10.jpg', status: 'review',
     naam: 'Gestapelde dozen, donker op wit',
-    notitie: 'Carport-inham: de bovendoos kraagt uit over de open hoek met kolommen. Donker-op-wit materiaalwissel volgt in fase 2.',
+    notitie: 'Carport-inham: de bovendoos kraagt uit over de open hoek met kolommen; donker-op-wit materiaalwissel per doos.',
     camera: { pos: [8.1, 3, 18.3], doel: [0, 3.2, 0], fov: 40 },
     params: {
       seed: 10,
@@ -185,6 +200,12 @@ export const KALIBRATIE_KERN = [
       sparingen: [],
       gevelElementen: [],
       kleuren: { gevel: '#26262a', dak: '#232327' },
+      materialen: {
+        gevel: { mat: 'stuc', kleur: 'wit' },
+        gevels: { boven: { mat: 'houtVerticaal', kleur: 'zwart' } },
+        dak: { mat: 'bitumen', kleur: 'zwart' },
+        accent: { mat: 'staalAccent', kleur: 'zwart' },
+      },
     },
   },
   {
@@ -199,6 +220,7 @@ export const KALIBRATIE_KERN = [
       sparingen: [],
       gevelElementen: [],
       kleuren: { gevel: '#26262a', dak: '#232327' },
+      materialen: { gevel: { mat: 'felsGevel', kleur: 'antraciet' }, dak: { mat: 'bitumen', kleur: 'zwart' }, accent: { mat: 'staalAccent', kleur: 'zwart' } },
     },
   },
   {
@@ -216,6 +238,7 @@ export const KALIBRATIE_KERN = [
       sparingen: [],
       gevelElementen: [],
       kleuren: { gevel: '#26262a', dak: '#232327' },
+      materialen: { gevel: { mat: 'felsGevel', kleur: 'zwart' }, dak: { mat: 'bitumen', kleur: 'zwart' }, accent: { mat: 'staalAccent', kleur: 'zwart' } },
     },
   },
 ]
