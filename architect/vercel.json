@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/kalibratie", "destination": "/index.html" },
-    { "source": "/kern", "destination": "/index.html" }
+    { "source": "/kern", "destination": "/index.html" },
+    { "source": "/reis", "destination": "/index.html" }
   ]
 }

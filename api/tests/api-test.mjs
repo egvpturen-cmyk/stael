@@ -100,9 +100,8 @@ try {
 } finally {
   console.log(fouten ? 'FAAL: ' + fouten + ' tests rood' : 'alle API-tests groen')
   fs.rmSync(tmp, { recursive: true, force: true })
-  // wacht op het serverproces voordat we zelf stoppen: dat houdt de
-  // exitcode betrouwbaar op Windows
-  server.once('exit', () => process.exit(fouten ? 1 : 0))
+  // natuurlijke afloop met exitCode: geforceerd exiten tijdens de
+  // child-kill geeft op Windows een libuv-assertion
+  process.exitCode = fouten ? 1 : 0
   server.kill()
-  setTimeout(() => process.exit(fouten ? 1 : 0), 3000)
 }

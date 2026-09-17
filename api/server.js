@@ -15,6 +15,7 @@ import express from 'express'
 import cors from 'cors'
 import crypto from 'crypto'
 import { maakOpslag } from './opslag.js'
+import { PERSOONLIJKHEID, FUNCTIES } from './persoonlijkheid.js'
 
 const app = express()
 const opslag = await maakOpslag()
@@ -141,6 +142,55 @@ app.post('/api/stem/sessie', async (req, res) => {
     })
   } catch (e) {
     res.status(502).json({ fout: 'stemdienst onbereikbaar', detail: String(e.message || e) })
+  }
+})
+
+// tekstkanaal: hetzelfde gesprek als de stem, via chat completions.
+// De server bepaalt systeemprompt en functies; de client levert alleen
+// de gespreksgeschiedenis (user, assistant, tool) aan
+app.post('/api/stem/tekst', async (req, res) => {
+  const { sessieToken, berichten } = req.body || {}
+  if (!sessieToken || !(await opslag.sessieLees(sessieToken))) {
+    return res.status(404).json({ fout: 'onbekende sessie' })
+  }
+  if (!Array.isArray(berichten) || berichten.length === 0 || berichten.length > 120) {
+    return res.status(400).json({ fout: 'berichten ontbreken of te veel' })
+  }
+  if (berichten.some(b => !['user', 'assistant', 'tool'].includes(b.role))) {
+    return res.status(400).json({ fout: 'alleen user, assistant en tool zijn toegestaan' })
+  }
+  if (process.env.STEM_TEST_MODUS === '1') {
+    return res.json({ tekst: 'testmodus: gebruik de scripted adapter', functieAanroepen: [], testModus: true })
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ fout: 'architect niet beschikbaar (geen sleutel)' })
+  }
+  try {
+    const antwoord = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + process.env.OPENAI_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.STEM_TEKST_MODEL || 'gpt-4.1-mini',
+        max_tokens: 500,
+        messages: [{ role: 'system', content: PERSOONLIJKHEID }, ...berichten],
+        tools: FUNCTIES.map(f => ({ type: 'function', function: f })),
+      }),
+    })
+    const data = await antwoord.json()
+    if (!antwoord.ok) {
+      return res.status(502).json({ fout: 'architect antwoordde niet', detail: data?.error?.message || null })
+    }
+    const keuze = data.choices?.[0]?.message || {}
+    res.json({
+      tekst: keuze.content || '',
+      functieAanroepen: (keuze.tool_calls || []).map(tc => ({
+        id: tc.id, naam: tc.function?.name,
+        args: (() => { try { return JSON.parse(tc.function?.arguments || '{}') } catch { return {} } })(),
+      })),
+      ruw: { role: keuze.role, content: keuze.content, tool_calls: keuze.tool_calls || undefined },
+    })
+  } catch (e) {
+    res.status(502).json({ fout: 'architect onbereikbaar', detail: String(e.message || e) })
   }
 })
 
