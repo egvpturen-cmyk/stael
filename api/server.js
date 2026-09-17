@@ -16,6 +16,9 @@ import cors from 'cors'
 import crypto from 'crypto'
 import { maakOpslag } from './opslag.js'
 import { PERSOONLIJKHEID, FUNCTIES } from './persoonlijkheid.js'
+import { collectieContext } from './collectie.js'
+
+const SYSTEEM = PERSOONLIJKHEID + '\n\n' + collectieContext()
 
 const app = express()
 const opslag = await maakOpslag()
@@ -172,7 +175,7 @@ app.post('/api/stem/tekst', async (req, res) => {
       body: JSON.stringify({
         model: process.env.STEM_TEKST_MODEL || 'gpt-4.1-mini',
         max_tokens: 500,
-        messages: [{ role: 'system', content: PERSOONLIJKHEID }, ...berichten],
+        messages: [{ role: 'system', content: SYSTEEM }, ...berichten],
         tools: FUNCTIES.map(f => ({ type: 'function', function: f })),
       }),
     })

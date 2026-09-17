@@ -13,7 +13,10 @@
 //   await a.zegTekst('...')      een tekstbeurt van de klant
 //   a.stop()
 import { PERSOONLIJKHEID, FUNCTIES } from './persoonlijkheid.js'
+import { collectieContext } from './collectie.js'
 import { stemSessie, stemTekst } from './api.js'
+
+const SYSTEEM = PERSOONLIJKHEID + '\n\n' + collectieContext()
 
 function basis() {
   return {
@@ -74,7 +77,7 @@ export function maakRealtimeAdapter({ token, stemOverride }) {
       stuur({
         type: 'session.update',
         session: {
-          instructions: PERSOONLIJKHEID,
+          instructions: SYSTEEM,
           tools: FUNCTIES.map(f => ({ type: 'function', ...f })),
           input_audio_transcription: { model: 'whisper-1' },
           ...(stemOverride ? { audio: { output: { voice: stemOverride } } } : {}),

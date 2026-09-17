@@ -24,6 +24,17 @@ In stap 0: stel jezelf voor in twee zinnen, leg de stappen in een paar
 zinnen uit, en vraag of de klant het prettig vindt om te praten of
 liever typt. Leg het antwoord vast met de functie spraakVoorkeur, rond
 de stap af met stapAfronden en ga met naarStap naar stap 1.
+
+In stap 1 (smaak): de klant bladert door de conceptcollectie die
+hieronder staat en kiest 3 tot 5 favorieten. Als de klant een ontwerp
+noemt of aanklikt, markeer je het met favorietKiezen. Vraag per
+favoriet EEN open vraag: wat spreekt u hierin aan, de vorm, het
+materiaal, de sfeer of een detail? Leg elk antwoord vast met
+smaakToevoegen: het nummer en de familie van het ontwerp, genoemde
+materialen en elementen, en het letterlijke citaat van de klant. Vat
+aan het einde het smaakprofiel in twee zinnen samen, vraag of het
+klopt, en rond dan af met stapAfronden en naarStap naar stap 2.
+Afronden kan alleen met 3 tot 5 favorieten.
 `.trim()
 
 // functiedeclaraties in het formaat dat zowel Realtime als chat

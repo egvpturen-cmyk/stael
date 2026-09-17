@@ -4,6 +4,7 @@
 // bewaking komt, gebeurt niet. Puur JavaScript zonder React, zodat de
 // gesprekstest hem in node kan draaien.
 import { sessiePatch } from './api.js'
+import { COLLECTIE } from './collectie.js'
 
 export function maakFuncties({ token, sessieRef, opUiSignaal }) {
   const sessie = () => sessieRef.huidige
@@ -54,6 +55,22 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
 
     async stapAfronden({ stap }) {
       if (stap !== sessie().stap) return { ok: false, fout: 'dit is niet de huidige stap' }
+      if (stap === 1) {
+        const fav = sessie().smaak.favorieten
+        if (fav.length < 3 || fav.length > 5) {
+          return { ok: false, fout: 'kies eerst 3 tot 5 favorieten (nu ' + fav.length + ')' }
+        }
+        // de familietelling volgt altijd deterministisch uit de
+        // gekozen favorieten, met of zonder gesprek
+        const smaak = structuredClone(sessie().smaak)
+        smaak.families = {}
+        for (const n of fav) {
+          const c = COLLECTIE.find(x => x.nummer === n)
+          if (c) smaak.families[c.familie] = (smaak.families[c.familie] || 0) + 1
+        }
+        await zet({ smaak })
+        signaal('smaak', smaak)
+      }
       signaal('stapAfgerond', { stap })
       return { ok: true, stap }
     },
