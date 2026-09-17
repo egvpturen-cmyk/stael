@@ -53,10 +53,18 @@ export const STAELDETAILS = {
     gordingProfiel: { h: .12, b: .06 },  // RYN-achtig koudgevormd, zichtbaar
     gordingHoh: .9,
   },
+  // nokdetail: EEN doorlopend knikprofiel met de vouwlijn op de noklijn;
+  // boeidelen en windveren komen in VERSTEK samen op de verticale lijn
+  // door de nok (geen ingekorte einden met lucht ertussen), en de
+  // nokvouw steekt aan de kopse kanten over zodat hij de versteknaad
+  // strak afdekt. De geveltop erachter is per definitie dicht (de
+  // wandcontour loopt tot de onderzijde van het dakpakket).
   nok: {
-    vouwBreedte: .3,           // afdekstrook per dakvlak, langs de helling
+    vouwBreedte: .3,           // flank van het knikprofiel, langs de helling
     overlap: .05,
     dikte: .03,
+    kopOverlap: .05,           // oversteek van de vouw over de boeidelen
+    detail: 'verstek',
   },
   kozijn: { profiel: .07, negge: .1 },   // aanname, aan te leveren
   materialen: {

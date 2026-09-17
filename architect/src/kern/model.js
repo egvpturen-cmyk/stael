@@ -283,28 +283,28 @@ export function bouwModel(p) {
 
   // randafwerking: automatisch langs alle dakranden, zodat elke rand
   // per constructie gesloten is; de invulling volgt de detailfamilie.
-  // boeidelen en windveren worden bij de nok ingekort met de
-  // vouwbreedte zodat ze exact tot in de vouw lopen (geen stapeling)
-  const nokTrim = STAELDETAILS.nok.vouwBreedte
+  // Nokdetail (staeldetails.js): boeidelen en windveren komen in
+  // VERSTEK samen op de verticale lijn door de nok, en de nokvouw
+  // steekt aan beide kopse kanten over zodat hij de versteknaad dekt.
   const randafwerking = [{
     type: 'nokvouw', volumeId: vol.id,
     profiel: nokProfiel(dakvlakken, STAELDETAILS.nok.vouwBreedte, STAELDETAILS.nok.dikte),
-    diepte: vol.d + 2 * vol.overstekKop,
+    diepte: vol.d + 2 * vol.overstekKop + 2 * STAELDETAILS.nok.kopOverlap,
   }]
   if (familie === 'strak') {
     // gevel en dakrand vormen een vlak: doorlopend boeideel, verholen goot
     randafwerking.push(
       { type: 'boeideel', kant: 1, volumeId: vol.id },
       { type: 'boeideel', kant: -1, volumeId: vol.id },
-      { type: 'boeikop', richting: 1, volumeId: vol.id, nokTrim },
-      { type: 'boeikop', richting: -1, volumeId: vol.id, nokTrim },
+      { type: 'boeikop', richting: 1, volumeId: vol.id },
+      { type: 'boeikop', richting: -1, volumeId: vol.id },
     )
   } else {
     randafwerking.push(
       { type: 'randprofiel', kant: 1, volumeId: vol.id },
       { type: 'randprofiel', kant: -1, volumeId: vol.id },
-      { type: 'windveer', richting: 1, volumeId: vol.id, nokTrim },
-      { type: 'windveer', richting: -1, volumeId: vol.id, nokTrim },
+      { type: 'windveer', richting: 1, volumeId: vol.id },
+      { type: 'windveer', richting: -1, volumeId: vol.id },
       { type: 'gordingen', kant: 1, volumeId: vol.id },
       { type: 'gordingen', kant: -1, volumeId: vol.id },
     )
