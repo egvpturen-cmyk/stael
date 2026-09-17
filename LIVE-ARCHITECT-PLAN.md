@@ -98,6 +98,8 @@ Het gebouwmodel (src/kern/) kent deze elementen en relaties:
 - Gevel-elementen: lamellenvelden, penanten, kaders, panelen en balkons horen bij een gastvlak en worden daar exact op geclipt.
 - Randafwerking: nokvorst, windveren, boeidelen, goten en (bij kruisende kappen) een kilkeper worden automatisch langs de dakranden gegenereerd, zodat elke dakrand per constructie gesloten is.
 
+Harde regel voor de IFC-referentie (referenties/ifc/): daaruit komen uitsluitend DETAILPRINCIPES (hoe een dakrand, nok, negge of materiaalkeuze eruitziet), nooit vormbeperkingen, maatgrenzen of typologiekeuzes. Het is een gerealiseerd voorbeeld uit honderden mogelijke varianten; vormen komen uit de kennisbank en de fotoreferenties. De maximale vrije overspanning is 12 m (door STAEL bevestigd als grens van het portaalsysteem), met 6 tot 9 m als comfortabele default-range voor gegenereerde varianten.
+
 De kopgevel is een eigen elementtype: een wand waarvan de vorm de volledige dakcontour volgt (driehoek, of vijfhoek bij een verschoven nok, inclusief dakdikte-aftrek). Alle elementen in die gevel (pui, kader, lamellenveld, penanten, balkon) hebben de kopgevel als gastvlak en worden tegen die contour gevalideerd en geclipt. Dit is de gevel waar tot nu toe de meeste fouten zaten en verdient daarom een eigen, expliciet behandeld geval.
 
 Determinisme is een harde eis: elk model is volledig reproduceerbaar uit zijn parameterset plus seed. Dezelfde invoer geeft exact hetzelfde huis, altijd, zodat de kalibratiepresets en opgeslagen klantontwerpen betrouwbare regressietests zijn. In de kern staat geen enkele Math.random zonder seed.

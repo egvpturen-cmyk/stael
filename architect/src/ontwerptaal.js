@@ -8,7 +8,11 @@
 export const STAEL = {
   kozijnKleur: '#1b1b1e',      // kozijnen altijd slank en donker
   kozijnDikte: 0.08,
-  maxOverspanning: 9.5,        // vrije overspanning staalportaal in meters
+  // vrije overspanning van het portaalsysteem: 12 m is de door STAEL
+  // bevestigde grens; 6 tot 9 m is de comfortabele default-range voor
+  // gegenereerde varianten, groter mag waar het programma erom vraagt
+  maxOverspanning: 12,
+  overspanningComfort: [6, 9],
   verdiepingFactor: 1.75,
   loftVerdiepingFactor: 1.9,
 }

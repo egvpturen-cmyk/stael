@@ -3,6 +3,9 @@
 // SketchUp/Trimble-export). Dit is de maatgevende detailleringsbron;
 // vormen blijven uit de kennisbank en de fotoreferenties komen.
 //
+// De maximale vrije overspanning van het portaalsysteem is 12 m,
+// door STAEL zelf bevestigd (niet uit dit IFC); zie ontwerptaal.js.
+//
 // GEMETEN in het IFC (scripts/ifc-analyse.mjs):
 // - voetafdruk 7,20 x 23,62 m; vrije overspanning van de beuk 7,2 m
 // - verdiepingsvloer op 2,65-2,70 m; gootzone 4,90-5,20 m; nok 7,88 m
@@ -21,10 +24,17 @@
 // - kozijnprofiel 70 mm, neggediepte 100 mm (kozijnen zitten niet in
 //   het staalmodel)
 
+// HARDE REGEL: uit het IFC komen uitsluitend DETAILPRINCIPES (hoe een
+// dakrand, nok, negge of materiaalkeuze eruitziet), NOOIT vormbeperkingen,
+// maatgrenzen of typologiekeuzes. Het is een voorbeeld uit honderden
+// mogelijke varianten. Gemeten hoofdmaten hieronder zijn uitsluitend
+// documentatie van dit ene voorbeeld en mogen nergens als grens of
+// default in de generator of de kern belanden.
+
 export const STAELDETAILS = {
   bron: 'referenties/ifc/staelwoning.ifc',
-  maxOverspanning: 7.2,        // gemeten beuk; eerdere aanname was 9,5
-  verdiepingsHoogte: 2.67,     // gemeten
+  // documentatie van dit ene voorbeeld, geen grenzen:
+  voorbeeld: { beuk: 7.2, lengte: 23.6, verdieping: 2.67, nok: 7.88, kap: 38 },
   dak: {
     dikte: .18,                // aanname, zie boven
     plaat: 'aluminium 2 mm',   // gemeten

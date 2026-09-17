@@ -70,6 +70,15 @@ function maakVariant(t, massaWens, prog, seed) {
 
   let ratio = tussen(r, t.ratio)
   let b = Math.sqrt(voet / ratio)
+  // blijf bij voorkeur binnen de comfortrange; grotere overspanningen
+  // tot de systeemgrens zijn toegestaan waar het programma erom vraagt
+  if (b > STAEL.overspanningComfort[1]) {
+    const ratioNodig = voet / (STAEL.overspanningComfort[1] ** 2)
+    if (ratioNodig <= t.ratio[1]) {
+      ratio = Math.max(ratio, ratioNodig)
+      b = Math.sqrt(voet / ratio)
+    }
+  }
   if (b > STAEL.maxOverspanning) b = STAEL.maxOverspanning
   const d = voet / b
 
