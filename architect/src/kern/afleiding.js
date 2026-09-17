@@ -3,62 +3,53 @@
 // tekent uitsluitend deze lijst en de gesloten-schil-validatie sampelt
 // tegen exact dezelfde lijst: zelfde functies, zelfde uitkomst.
 //
-// Primitief: { vorm:'box', pos:[x,y,z], ry, rz, size:[sx,sy,sz], kleur, rol }
-//            { vorm:'extrude', contour:[[u,v]..], holes:[[[u,v]..]..],
-//              dikte, pos:[x,y,z], ry, kleur, rol }
 // Transformconventie (renderer en sampler identiek):
 //   wereld = translatie(pos) . rotatieY(ry) . rotatieZ(rz) . lokaal
 
-import { WAND_DIKTE, dakOnderY } from './model.js'
+import { WAND_DIKTE, dakOnderY, vlakRichting } from './model.js'
 import { STAELDETAILS } from './staeldetails.js'
-
-const vlakRicht = vlak => {
-  const [gu, gv] = vlak.goot2D, [nu, nv] = vlak.nok2D
-  const n0 = Math.hypot(gu - nu, gv - nv)
-  const u = [(gu - nu) / n0, (gv - nv) / n0]
-  let n = [-u[1], u[0]]
-  if (n[1] < 0) n = [-n[0], -n[1]]
-  return { u, n, n0, nok: [nu, nv], hoek: Math.atan2(u[1], u[0]) }
-}
 
 // wandtransform: lokaal z = WAND_DIKTE is bij elke gevel het buitenvlak
 export function wandTransform(wand, vol) {
+  const [px, pz] = vol.pos || [0, 0]
   if (wand.type === 'kop') {
-    return { pos: [0, 0, wand.richting * (vol.d / 2 - WAND_DIKTE)], ry: wand.richting === 1 ? 0 : Math.PI }
+    return {
+      pos: [px, 0, pz + wand.richting * (vol.d / 2 - WAND_DIKTE)],
+      ry: wand.richting === 1 ? 0 : Math.PI,
+    }
   }
-  return { pos: [wand.kant * (vol.b / 2 - WAND_DIKTE), 0, 0], ry: wand.kant * Math.PI / 2 }
+  return {
+    pos: [px + wand.kant * (vol.b / 2 - WAND_DIKTE), 0, pz],
+    ry: wand.kant * Math.PI / 2,
+  }
 }
 
-// zet een lokaal punt (in wandcoordinaten) om naar wereld
 function naarWereld(t, p) {
   const [x, y, z] = p
   const c = Math.cos(t.ry), s = Math.sin(t.ry)
   return [t.pos[0] + c * x + s * z, t.pos[1] + y, t.pos[2] - s * x + c * z]
 }
 
+const sparingPoly = sp => sp.poly || [
+  [sp.rect.u - sp.rect.w / 2, sp.rect.v], [sp.rect.u + sp.rect.w / 2, sp.rect.v],
+  [sp.rect.u + sp.rect.w / 2, sp.rect.v + sp.rect.h], [sp.rect.u - sp.rect.w / 2, sp.rect.v + sp.rect.h]]
+
 export function leidGeometrieAf(model, opties = {}) {
-  const vol = model.volumes[0]
   const K = model.kleuren
   const prims = []
-  const dikV = vol.dakDikte / Math.cos(Math.atan2(vol.nok - vol.goot, vol.b / 2 - Math.abs(vol.nokOffset)) || 0)
+  const volVan = id => model.volumes.find(v => v.id === id)
 
-  // ---- wanden met sparingen als echte gaten ----
+  // ---- wanden, vullingen, gevel-elementen ----
   for (const wand of model.wanden) {
+    const vol = volVan(wand.volumeId)
     const t = wandTransform(wand, vol)
     prims.push({
       vorm: 'extrude', rol: 'wand', kleur: K.gevel,
-      contour: wand.contour,
-      holes: wand.sparingen.map(sp => sp.poly || [
-        [sp.rect.u - sp.rect.w / 2, sp.rect.v], [sp.rect.u + sp.rect.w / 2, sp.rect.v],
-        [sp.rect.u + sp.rect.w / 2, sp.rect.v + sp.rect.h], [sp.rect.u - sp.rect.w / 2, sp.rect.v + sp.rect.h]]),
+      contour: wand.contour, holes: wand.sparingen.map(sparingPoly),
       dikte: WAND_DIKTE, pos: t.pos, ry: t.ry,
     })
-
-    // vullingen: glas (dicht vlak) plus kozijnprofielen midden in de sparing
     for (const sp of wand.sparingen) {
-      const pts = sp.poly || [
-        [sp.rect.u - sp.rect.w / 2, sp.rect.v], [sp.rect.u + sp.rect.w / 2, sp.rect.v],
-        [sp.rect.u + sp.rect.w / 2, sp.rect.v + sp.rect.h], [sp.rect.u - sp.rect.w / 2, sp.rect.v + sp.rect.h]]
+      const pts = sparingPoly(sp)
       prims.push({
         vorm: 'extrude', rol: 'glas', kleur: K.glas,
         contour: pts, holes: [], dikte: .02,
@@ -66,12 +57,11 @@ export function leidGeometrieAf(model, opties = {}) {
       })
       for (let i = 0; i < pts.length; i++) {
         const [u1, v1] = pts[i], [u2, v2] = pts[(i + 1) % pts.length]
-        const len = Math.hypot(u2 - u1, v2 - v1)
         prims.push({
           vorm: 'box', rol: 'kozijn', kleur: K.kozijn,
           pos: naarWereld(t, [(u1 + u2) / 2, (v1 + v2) / 2, WAND_DIKTE / 2]),
-          ry: t.ry, rz: sinHoek(t.ry, Math.atan2(v2 - v1, u2 - u1)),
-          size: [len, .09, .18],
+          ry: t.ry, rz: spiegelRz(t.ry, Math.atan2(v2 - v1, u2 - u1)),
+          size: [Math.hypot(u2 - u1, v2 - v1), .09, .18],
         })
       }
       if (sp.type === 'pui') {
@@ -90,8 +80,6 @@ export function leidGeometrieAf(model, opties = {}) {
         }
       }
     }
-
-    // gevel-elementen (uit het model, al geclipt)
     for (const el of wand.elementen || []) {
       if (el.type === 'blok') {
         prims.push({
@@ -104,16 +92,13 @@ export function leidGeometrieAf(model, opties = {}) {
         prims.push({
           vorm: 'box', rol: 'element', kleur: el.kleur || '#8a7a5e',
           pos: naarWereld(t, [(u1 + u2) / 2, (v1 + v2) / 2, WAND_DIKTE + (el.uit ?? 0) + el.diep / 2]),
-          ry: t.ry, rz: sinHoek(t.ry, Math.atan2(v2 - v1, u2 - u1)),
+          ry: t.ry, rz: spiegelRz(t.ry, Math.atan2(v2 - v1, u2 - u1)),
           size: [Math.hypot(u2 - u1, v2 - v1) + .02, el.b, el.diep],
         })
       } else if (el.type === 'balkon') {
         const z0 = WAND_DIKTE + .02
-        const dl = [[0, 0, el.diepte / 2, el.breedte, .12, el.diepte],
-          [0, .62, el.diepte - .03, el.breedte, .05, .05]]
-        for (const [u, v, z, sx, sy, sz] of dl) {
-          prims.push({ vorm: 'box', rol: 'balkon', kleur: K.kozijn, pos: naarWereld(t, [el.u + u, el.vloer + v, z0 + z]), ry: t.ry, rz: 0, size: [sx, sy, sz] })
-        }
+        prims.push({ vorm: 'box', rol: 'balkon', kleur: K.kozijn, pos: naarWereld(t, [el.u, el.vloer, z0 + el.diepte / 2]), ry: t.ry, rz: 0, size: [el.breedte, .12, el.diepte] })
+        prims.push({ vorm: 'box', rol: 'balkon', kleur: K.kozijn, pos: naarWereld(t, [el.u, el.vloer + .62, z0 + el.diepte - .03]), ry: t.ry, rz: 0, size: [el.breedte, .05, .05] })
         const n = Math.max(8, Math.round(el.breedte / .15))
         for (let i = 0; i <= n; i++) {
           prims.push({
@@ -135,65 +120,101 @@ export function leidGeometrieAf(model, opties = {}) {
 
   // ---- dakvlakken ----
   for (const vlak of model.dakvlakken) {
-    const { u, n, n0, nok, hoek } = vlakRicht(vlak)
-    const len = n0 - vlak.inzetLangs + vlak.overstekLangs
+    const vol = volVan(vlak.volumeId)
+    const [px, pz] = vol.pos || [0, 0]
+    if (vlak.plat) {
+      prims.push({
+        vorm: 'box', rol: 'dak', kleur: K.dak,
+        pos: [px, vol.goot + vlak.dikte / 2, pz], ry: 0, rz: 0,
+        size: [vol.b + .02, vlak.dikte, vol.d + .02],
+      })
+      continue
+    }
+    const { u, n, n0, nok } = vlakRichting(vlak)
+    const extra = vlak.zijLuifel ? vlak.zijLuifel.uit : 0
+    const len = n0 - vlak.inzetLangs + vlak.overstekLangs + extra
+    const veranda = vlak.verandaKop || 0
+    const diepte = vol.d + 2 * vlak.overstekKop + veranda
     prims.push({
       vorm: 'box', rol: 'dak', kleur: K.dak,
-      pos: [nok[0] + u[0] * (len / 2) + n[0] * (vlak.dikte / 2), nok[1] + u[1] * (len / 2) + n[1] * (vlak.dikte / 2), 0],
-      ry: 0, rz: hoek, size: [len, vlak.dikte, vol.d + 2 * vlak.overstekKop],
+      pos: [px + nok[0] + u[0] * (len / 2) + n[0] * (vlak.dikte / 2),
+        nok[1] + u[1] * (len / 2) + n[1] * (vlak.dikte / 2),
+        pz + veranda / 2],
+      ry: 0, rz: Math.atan2(u[1], u[0]), size: [len, vlak.dikte, diepte],
     })
+    if (vlak.zijLuifel) {
+      // schijfwand onder het einde van het doorgetrokken dakvlak
+      const eind = n0 + vlak.overstekLangs + extra
+      const ex = nok[0] + u[0] * eind, ey = Math.max(1.1, nok[1] + u[1] * eind)
+      prims.push({
+        vorm: 'box', rol: 'schijfwand', kleur: vlak.zijLuifel.wandKleur || '#31302c',
+        pos: [px + ex, ey / 2, pz + vol.d / 2 - .9], ry: 0, rz: 0,
+        size: [.3, ey, 1.5],
+      })
+    }
   }
 
   // ---- randafwerking ----
   for (const rand of model.randafwerking) {
+    const vol = volVan(rand.volumeId)
+    const [px, pz] = vol.pos || [0, 0]
+    const dikV = vol.plat ? vol.dakDikte
+      : vol.dakDikte / Math.cos(Math.atan2(vol.nok - vol.goot, vol.b / 2 - Math.abs(vol.nokOffset)) || 0)
+
+    if (rand.type === 'daklijst') {
+      // plat volume: dun opstaand randje rondom, een vlak met de gevel
+      const h = vol.dakDikte + .1
+      const y = vol.goot + h / 2 - .02
+      if (rand.rand.startsWith('kop')) {
+        const ri = rand.rand === 'kop+' ? 1 : -1
+        prims.push({ vorm: 'box', rol: 'daklijst', kleur: K.gevel, pos: [px, y, pz + ri * (vol.d / 2 + .005)], ry: 0, rz: 0, size: [vol.b + .06, h, .04] })
+      } else {
+        const ka = rand.rand === 'langs+' ? 1 : -1
+        prims.push({ vorm: 'box', rol: 'daklijst', kleur: K.gevel, pos: [px + ka * (vol.b / 2 + .005), y, pz], ry: 0, rz: 0, size: [.04, h, vol.d + .06] })
+      }
+    }
     if (rand.type === 'nokvouw') {
+      const totaal = rand.diepteVoor + rand.diepteAchter
       prims.push({
         vorm: 'extrude', rol: 'nokvouw', kleur: K.dak,
-        contour: rand.profiel, holes: [], dikte: rand.diepte,
-        pos: [0, 0, -rand.diepte / 2], ry: 0,
+        contour: rand.profiel.map(([x, y]) => [x + px, y]), holes: [], dikte: totaal,
+        pos: [0, 0, pz - rand.diepteAchter], ry: 0,
       })
     }
     if (rand.type === 'boeideel') {
       const h = dikV + .12
       prims.push({
         vorm: 'box', rol: 'boeideel', kleur: K.gevel,
-        pos: [rand.kant * (vol.b / 2 + .005), vol.goot + h / 2 - .01, 0],
+        pos: [px + rand.kant * (vol.b / 2 + .005), vol.goot + h / 2 - .01, pz],
         ry: 0, rz: 0, size: [.04, h, vol.d],
       })
     }
     if (rand.type === 'boeikop' || rand.type === 'windveer') {
-      // detail vastgelegd in staeldetails.js: boeidelen komen in VERSTEK
-      // samen op de verticale lijn door de nok, de nokvouw overlapt de
-      // naad. De oude (foute) uitvoering met ingekorte einden blijft
-      // beschikbaar als bewijs- en regressiepad voor de schilcheck.
-      const zPos = rand.type === 'boeikop'
-        ? rand.richting * (vol.d / 2 + .005)
-        : rand.richting * (vol.d / 2 + (model.dakvlakken[0].overstekKop || 0) - .025)
+      const veranda = vol.verandaKop && rand.richting === 1 ? vol.verandaKop.diepte : 0
+      const zPos = pz + rand.richting * (vol.d / 2 + vol.overstekKop + veranda + (rand.type === 'boeikop' ? .005 : -.025))
       const dik = rand.type === 'boeikop' ? .04 : .05
-      for (const vlak of model.dakvlakken) {
-        const { u, n, n0, nok } = vlakRicht(vlak)
+      for (const vlak of model.dakvlakken.filter(v => v.volumeId === vol.id)) {
+        const { u, n, n0, nok } = vlakRichting(vlak)
         const hv = (vlak.dikte + .12) / Math.max(.25, Math.abs(n[1]))
         if (opties.oudeBoei) {
-          const trim = rand.nokTrim ?? 0
+          const trim = STAELDETAILS.nok.vouwBreedte
           const len = n0 - vlak.inzetLangs + (rand.type === 'windveer' ? vlak.overstekLangs : 0) - trim + .04
           prims.push({
             vorm: 'box', rol: rand.type, kleur: rand.type === 'boeikop' ? K.gevel : K.kozijn,
-            pos: [nok[0] + u[0] * (trim + len / 2 - .04) + n[0] * (vlak.dikte / 2),
+            pos: [px + nok[0] + u[0] * (trim + len / 2 - .04) + n[0] * (vlak.dikte / 2),
               nok[1] + u[1] * (trim + len / 2 - .04) + n[1] * (vlak.dikte / 2), zPos],
             ry: 0, rz: Math.atan2(u[1], u[0]), size: [len, vlak.dikte + .12, dik],
           })
         } else {
-          // het boeideel loopt door tot de gevelrand (of het einde van
-          // het overstek); de plaat-inzet geldt voor de plaat, niet
-          // voor de afwerking
+          // verstek op de verticale lijn door de nok (staeldetails.js)
           const eindLangs = n0 + (rand.type === 'windveer' ? vlak.overstekLangs : 0)
           const eind = [nok[0] + u[0] * eindLangs, nok[1] + u[1] * eindLangs]
-          const onder = -.03 // net onder de daklijn beginnen: overlap met de wand
+          const onder = -.03
           prims.push({
             vorm: 'extrude', rol: rand.type, kleur: rand.type === 'boeikop' ? K.gevel : K.kozijn,
             contour: [
-              [vol.nokOffset, vol.nok + onder], [eind[0], eind[1] + onder],
-              [eind[0], eind[1] + onder + hv], [vol.nokOffset, vol.nok + onder + hv],
+              [px + vol.nokOffset, vol.nok + onder], [px + eind[0], eind[1] + onder],
+              [px + eind[0], eind[1] + onder + hv], [px + vol.nokOffset, vol.nok + onder + hv],
             ],
             holes: [], dikte: dik, pos: [0, 0, zPos - dik / 2], ry: 0,
           })
@@ -201,36 +222,73 @@ export function leidGeometrieAf(model, opties = {}) {
       }
     }
     if (rand.type === 'randprofiel') {
-      const vlak = model.dakvlakken.find(v => v.kant === rand.kant)
-      const { u, n0, nok } = vlakRicht(vlak)
+      const vlak = model.dakvlakken.find(v => v.volumeId === vol.id && v.kant === rand.kant)
+      const { u, n0, nok } = vlakRichting(vlak)
       const eind = n0 - vlak.inzetLangs + vlak.overstekLangs
       prims.push({
         vorm: 'box', rol: 'randprofiel', kleur: K.kozijn,
-        pos: [nok[0] + u[0] * eind, nok[1] + u[1] * eind + vlak.dikte / 2 + .01, 0],
+        pos: [px + nok[0] + u[0] * eind, nok[1] + u[1] * eind + vlak.dikte / 2 + .01, pz],
         ry: 0, rz: 0, size: [.04, .12, vol.d + 2 * vlak.overstekKop],
       })
     }
     if (rand.type === 'gordingen') {
-      const vlak = model.dakvlakken.find(v => v.kant === rand.kant)
-      const { u, n, n0, nok } = vlakRicht(vlak)
+      const vlak = model.dakvlakken.find(v => v.volumeId === vol.id && v.kant === rand.kant)
+      const { u, n, n0, nok } = vlakRichting(vlak)
       const nG = Math.max(2, Math.round(vol.d / STAELDETAILS.kolossaal.gordingHoh))
       const len = vlak.overstekLangs + 1.1
       const sC = n0 - vlak.inzetLangs + vlak.overstekLangs - len / 2
       for (let i = 0; i <= nG; i++) {
         prims.push({
           vorm: 'box', rol: 'gording', kleur: '#26262a',
-          pos: [nok[0] + u[0] * sC + n[0] * -.08, nok[1] + u[1] * sC + n[1] * -.08, -vol.d / 2 + (vol.d / nG) * i],
+          pos: [px + nok[0] + u[0] * sC + n[0] * -.08, nok[1] + u[1] * sC + n[1] * -.08, pz - vol.d / 2 + (vol.d / nG) * i],
           ry: 0, rz: Math.atan2(u[1], u[0]), size: [len, .12, .06],
         })
+      }
+    }
+    if (rand.type === 'verandakolommen') {
+      const diepte = rand.diepte
+      if (rand.portaal) {
+        // portaal: stijlen tot de grond plus daklijnstroken in verstek
+        for (const kant of [-1, 1]) {
+          const x = kant * (vol.b / 2 - .2)
+          const h = dakOnderY(x, vol)
+          prims.push({ vorm: 'box', rol: 'portaal', kleur: '#d8d4c9', pos: [px + x, h / 2, pz + vol.d / 2 + diepte - .3], ry: 0, rz: 0, size: [.42, h, .5] })
+        }
+        for (const vlak of model.dakvlakken.filter(v => v.volumeId === vol.id && !v.plat)) {
+          const { u, n, n0, nok } = vlakRichting(vlak)
+          const eind = [nok[0] + u[0] * n0, nok[1] + u[1] * n0]
+          // de kaderhoogte volgt de dakpakketdikte van dit vlak
+          const hv = (vlak.dikte + .12) / Math.max(.25, Math.abs(n[1])) + .06
+          prims.push({
+            vorm: 'extrude', rol: 'portaal', kleur: '#d8d4c9',
+            contour: [
+              [px + vol.nokOffset, vol.nok - .03], [px + eind[0], eind[1] - .03],
+              [px + eind[0], eind[1] - .03 + hv], [px + vol.nokOffset, vol.nok - .03 + hv],
+            ],
+            holes: [], dikte: .5, pos: [0, 0, pz + vol.d / 2 + diepte - .55], ry: 0,
+          })
+        }
+      } else {
+        const nK = Math.max(1, rand.kolommen ?? 2)
+        for (const kant of [-1, 1]) {
+          for (let i = 0; i < nK; i++) {
+            const z = nK === 1 ? vol.d / 2 + diepte - .45
+              : vol.d / 2 + .35 + (diepte - .8) * (i / (nK - 1))
+            prims.push({
+              vorm: 'box', rol: 'kolom', kleur: '#26262a',
+              pos: [px + kant * (vol.b / 2 - .25), vol.goot / 2, pz + z],
+              ry: 0, rz: 0, size: [.12, vol.goot, .12],
+            })
+          }
+        }
+        prims.push({ vorm: 'box', rol: 'terras', kleur: '#6e685d', pos: [px, .02, pz + vol.d / 2 + diepte / 2 - .2], ry: 0, rz: 0, size: [vol.b - .4, .05, diepte + .5] })
       }
     }
   }
   return prims
 }
 
-// hulpfuncties gedeeld met het model
-function sinHoek(ry, rz) {
-  // op gespiegelde wanden (ry = pi) spiegelt een rotatie in het vlak
+function spiegelRz(ry, rz) {
   return Math.abs(Math.abs(ry) - Math.PI) < .01 ? -rz : rz
 }
 
@@ -244,9 +302,31 @@ export function randVanPoly(pts, u) {
   return beste
 }
 
-// ---- punt-in-primitief, voor de gesloten-schil-sampling ----
+// ---- punt-in-primitief met bol-voorfilter ----
+export function primBol(prim) {
+  if (prim.bol) return prim.bol
+  if (prim.vorm === 'box') {
+    prim.bol = { c: prim.pos, r: Math.hypot(...prim.size) / 2 + .05 }
+  } else {
+    const us = prim.contour.map(p => p[0]), vs = prim.contour.map(p => p[1])
+    const cu = (Math.min(...us) + Math.max(...us)) / 2
+    const cv = (Math.min(...vs) + Math.max(...vs)) / 2
+    const ru = (Math.max(...us) - Math.min(...us)) / 2
+    const rv = (Math.max(...vs) - Math.min(...vs)) / 2
+    const c = Math.cos(prim.ry || 0), s = Math.sin(prim.ry || 0)
+    prim.bol = {
+      c: [prim.pos[0] + c * cu + s * prim.dikte / 2, prim.pos[1] + cv,
+        prim.pos[2] - s * cu + c * prim.dikte / 2],
+      r: Math.hypot(ru, rv, prim.dikte / 2) + .05,
+    }
+  }
+  return prim.bol
+}
+
 export function dektPunt(prim, P, tol = .03) {
-  // wereld -> lokaal: eerst translatie, dan -ry, dan -rz
+  const bol = primBol(prim)
+  const dx = P[0] - bol.c[0], dy = P[1] - bol.c[1], dz2 = P[2] - bol.c[2]
+  if (dx * dx + dy * dy + dz2 * dz2 > bol.r * bol.r) return false
   let [x, y, z] = [P[0] - prim.pos[0], P[1] - prim.pos[1], P[2] - prim.pos[2]]
   if (prim.ry) {
     const c = Math.cos(-prim.ry), s = Math.sin(-prim.ry)
@@ -262,15 +342,14 @@ export function dektPunt(prim, P, tol = .03) {
       && Math.abs(z) <= prim.size[2] / 2 + tol
   }
   if (z < -tol || z > prim.dikte + tol) return false
-  if (!inPoly([x, y], prim.contour, tol)) return false
+  if (!inPolyMetGroei([x, y], prim.contour, tol)) return false
   for (const gat of prim.holes) {
-    if (inPoly([x, y], gat, -tol)) return false
+    if (inPolyMetGroei([x, y], gat, -tol)) return false
   }
   return true
 }
 
-function inPoly([x, y], poly, groei = 0) {
-  // even-odd met een kleine groeimarge via afstand tot de rand
+export function inPolyMetGroei([x, y], poly, groei = 0) {
   let binnen = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i], [xj, yj] = poly[j]
@@ -278,7 +357,6 @@ function inPoly([x, y], poly, groei = 0) {
   }
   if (binnen) return true
   if (groei <= 0) return false
-  // punt vlak buiten de rand telt mee binnen de tolerantie
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     if (afstandTotSegment([x, y], poly[j], poly[i]) <= groei) return true
   }
