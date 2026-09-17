@@ -1,4 +1,4 @@
-import { STAEL, KLEUREN, MASSAS, STRAMIENEN, ELEMENTEN, TYPOLOGIEEN, typologieenVoor } from './ontwerptaal.js'
+import { STAEL, KLEUREN, MASSAS, STRAMIENEN, KOPTHEMAS, SECUNDAIR, TYPOLOGIEEN, typologieenVoor } from './ontwerptaal.js'
 
 // deterministische pseudo-random: zelfde programma en ronde geven
 // dezelfde set, een nieuwe ronde geeft echt andere combinaties
@@ -14,6 +14,13 @@ function rng(seed) {
 const tussen = (r, [lo, hi]) => lo + r() * (hi - lo)
 const grad = g => g * Math.PI / 180
 const kies = (r, lijst) => lijst[Math.floor(r() * lijst.length) % lijst.length]
+function kiesGewogen(r, items) {
+  const totaal = items.reduce((s, [, g]) => s + g, 0)
+  let lot = r() * totaal
+  for (const [naam, g] of items) { lot -= g; if (lot <= 0) return naam }
+  return items[items.length - 1][0]
+}
+const donker = kleur => [KLEUREN.houtZwart, KLEUREN.staalZwart].includes(kleur)
 function schud(r, lijst) {
   const l = [...lijst]
   for (let i = l.length - 1; i > 0; i--) {
@@ -112,45 +119,101 @@ function maakVariant(t, massaWens, prog, seed) {
         nok2: Math.max(3.4, nok * .72),
         z: -d / 2 + d * (.3 + r() * .25),
       }
+      // zoals in referentie 4: het dwarsvolume krijgt de pui,
+      // de hoofdkopgevel wordt dicht met kaders, ramen en deur
+      spec.kopPui = false
+      spec.kop.kaderKleur = donker(spec.gevel) ? KLEUREN.houtBlank : KLEUREN.houtWarm
+      spec.gevel2 = donker(spec.gevel) ? KLEUREN.stucLicht : KLEUREN.felsBlauwgrijs
     }
     if (massaWens === 'asym') {
       spec.nokOffset = (r() < .5 ? -1 : 1) * b * (.1 + r() * .15)
     }
-    if (massaWens === 'zwevend') {
+    if (massaWens === 'stapel') {
       spec.plat = true; spec.helling = 0
-      spec.nok = Math.min(6.6, regels.nokMax)
+      spec.nok = Math.min(6.4, Math.max(regels.nokMax, 6.2))
       spec.goot = spec.nok
-      spec.zwevend = {
-        onderH: 3.0,
-        overhang: Math.min(2.4, d * .22),
-        onderKrimp: .72,
+      const onderH = 3.0, bovenH = spec.nok - onderH
+      const richting = kies(r, ['voor', 'zij', 'terug'])
+      const st = {
+        onder: { b, d, h: onderH, kleur: donker(spec.gevel) ? KLEUREN.wit : spec.gevel },
+        boven: { b, d, h: bovenH, kleur: spec.gevel },
+        glasband: { y0: onderH + .3, y1: spec.nok - .5 },
       }
+      if (richting === 'voor') st.boven.z = d * .18
+      if (richting === 'zij') {
+        st.boven.x = -b * .26
+        st.kolommen = [{ x: -b * .26 - b / 2 + .4, z: d * .34 }]
+      }
+      if (richting === 'terug') {
+        st.boven = { ...st.boven, d: d * .78, z: -d * .1 }
+        spec.balustrades = [{ x: 0, y: onderH + .1, z: d / 2 - .3, w: b - .6 }]
+        if (r() < .5) spec.pergola = { x: 0, y: spec.nok + .25, b: b + .5, d: d * .4, z: d * .3, stap: .5 }
+      }
+      if (r() < .5) st.glasbandOnder = { y0: .25, y1: onderH - .3 }
+      else if (richting !== 'zij') spec.glasPanelen = [{ vlak: 'kop', x: b * .05, y: 1.55, w: b * .6, h: 2.5, z: d / 2 + (st.onder.z || 0) + .06, stijlen: 4 }]
+      spec.stapel = st
     }
   }
   spec.zinnen.push(MASSAS[spec.massa].zin)
 
-  // kop-stijl en stramien
+  // dominant kopgevel-thema: er wordt er precies een gekozen
+  if (spec.massa === 'dwarskap') {
+    spec.kopThema = 'dwarsPui'
+    spec.zinnen.push('de glazen kopgevel in het dwarsvolume, de hoofdgevel dicht met kaders en ramen')
+  } else {
+    const kandidaten = Object.entries(KOPTHEMAS)
+      .filter(([, def]) => def.kan(spec, prog))
+      .map(([naam, def]) => [naam, def.gewicht])
+    spec.kopThema = kiesGewogen(r, kandidaten)
+    const thema = KOPTHEMAS[spec.kopThema]
+    if (spec.kopThema === 'puiKader') {
+      spec.kop.kader = true
+      spec.kop.kaderKleur = donker(spec.gevel) ? KLEUREN.houtBlank : KLEUREN.houtZwart
+      spec.kop.puiFactor = .78
+    }
+    if (spec.kopThema === 'puiLamellen') spec.kop.lamellen = true
+    if (spec.kopThema === 'puiPenanten') {
+      spec.kop.penanten = { n: 3, breedte: .5, kleur: KLEUREN.houtWarm, hMax: spec.goot + .3 }
+      spec.kop.puiFactor = .82
+    }
+    if (spec.kopThema === 'portaal') {
+      const uit = .5 + r() * 1.8
+      spec.portaal = { uit, kleur: donker(spec.gevel) ? KLEUREN.houtBlank : KLEUREN.wit }
+      if (uit > 1.2) spec.veranda = { diepte: uit, kolommen: 0 }
+      spec.kop.puiFactor = .8
+    }
+    if (spec.kopThema === 'lamellenVeld') {
+      spec.lamellenVelden = [{ x: 0, y0: spec.goot * .5, y1: spec.goot - .8, w: b * .8, uit: .3 }]
+      spec.kop.puiFactor = .8
+    }
+    spec.zinnen.push(thema.zin)
+  }
   spec.zinnen.push(STRAMIENEN[spec.kop.stramien].zin)
 
-  // creatieve laag: 2 tot 4 elementen, gedoseerd en alleen waar logisch
-  const aantal = 2 + Math.floor(r() * 3)
-  const kandidaten = schud(r, Object.keys(ELEMENTEN))
+  // secundaire laag: een of twee elementen, gedoseerd en zonder conflicten
+  const aantal = 1 + (r() < .45 ? 1 : 0)
+  const volgorde = schud(r, Object.entries(SECUNDAIR).map(([naam, def]) => [naam, def.gewicht]))
   const gekozen = []
-  for (const naam of kandidaten) {
+  for (const [naam] of volgorde) {
     if (gekozen.length >= aantal) break
-    const el = ELEMENTEN[naam]
+    const el = SECUNDAIR[naam]
     if (!el.kan(spec, prog)) continue
-    if (gekozen.some(g => ELEMENTEN[g].sluit.includes(naam) || el.sluit.includes(g))) continue
+    if (gekozen.some(g => SECUNDAIR[g].sluit.includes(naam) || el.sluit.includes(g))) continue
     gekozen.push(naam)
   }
-  spec.elementen = gekozen
-  if (gekozen.includes('kader')) spec.kop.kader = true
-  if (gekozen.includes('lamellen')) spec.kop.lamellen = true
-  if (gekozen.includes('materiaalwissel')) {
-    spec.gevel2 = spec.gevel === KLEUREN.houtZwart || spec.gevel === KLEUREN.staalZwart
-      ? KLEUREN.stucLicht : KLEUREN.houtZwart
+  spec.secundair = gekozen
+  for (const naam of gekozen) {
+    if (naam === 'veranda') spec.veranda = { diepte: 2.2 + r() * 1.2, kolommen: 2 + (r() < .4 ? 1 : 0) }
+    else if (naam === 'zijLuifel') spec.zijLuifel = { kant: r() < .5 ? -1 : 1, uit: 1.6 + r() * .8, wandKleur: donker(spec.gevel) ? KLEUREN.houtBlank : KLEUREN.houtZwart }
+    else if (naam === 'aanbouw') spec.aanbouwen = [{ x: -(b / 2 + 2.3), z: d * .26, b: 3.6, d: 5, h: Math.min(2.9, Math.max(2.5, spec.goot * .9)), kleur: spec.gevel2 || spec.gevel, dakUitX: 2.2, deur: true }]
+    else if (naam === 'plint') spec.plint = { h: Math.min(3, spec.goot * .92), kleur: donker(spec.gevel) ? KLEUREN.houtBlank : KLEUREN.houtZwart }
+    else if (naam === 'dakOpbouw') spec.dakOpbouw = { b: 2.2, d: 2.4, h: 1.1, x: -b * .22, z: -d * .25 }
+    else if (naam === 'lamellenEntree') spec.lamellenVelden = [...(spec.lamellenVelden || []), { x: -b * .22, y0: 3.3, y1: Math.min(5.1, spec.nok - .8), w: 2.2, uit: .12 }]
+    else if (naam === 'erker') { spec.elementen.push('hoekpui'); spec.hoekpuiKant = r() < .5 ? -1 : 1 }
+    else if (naam === 'bijgebouw') spec.elementen.push('bijgebouw')
+    else spec.elementen.push(naam) // balkon, dakramen, dakkapel, schoorsteen, entreeKader, entreeLuifel
+    spec.zinnen.push(SECUNDAIR[naam].zin)
   }
-  gekozen.forEach(naam => spec.zinnen.push(ELEMENTEN[naam].zin))
 
   spec.naam = t.naam + (spec.massa !== 'enkel' ? ' · ' + MASSAS[spec.massa].naam : '')
   spec.beschrijving = maakBeschrijving(spec)
@@ -216,11 +279,11 @@ export function bouwSpec(p) {
 }
 
 function maakBeschrijving(spec) {
-  const [massa, stramien, ...rest] = spec.zinnen
+  const [massa, kopthema, , ...rest] = spec.zinnen
   let zin = spec.typologie.kern.charAt(0).toUpperCase() + spec.typologie.kern.slice(1)
     + ', als ' + massa + '. '
-  zin += stramien.charAt(0).toUpperCase() + stramien.slice(1)
-  if (rest.length) zin += ', met ' + rest.join(', ') + '.'
+  zin += kopthema.charAt(0).toUpperCase() + kopthema.slice(1)
+  if (rest.length) zin += ', met ' + rest.join(' en ') + '.'
   else zin += '.'
   return zin
 }

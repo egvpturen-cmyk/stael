@@ -52,7 +52,7 @@ export const TYPOLOGIEEN = [
     dakvormen: ['zadel', 'plat', 'mix'], ratio: [1.35, 1.7], goot: [5.9, 6.4],
     helling: [30, 36], overstek: 0.45, lagen: [2],
     gevels: ['houtGrijs', 'staalZwart', 'houtWarm'], daken: ['felsAntraciet', 'zink'],
-    massas: ['enkel', 'zwevend', 'asym'],
+    massas: ['enkel', 'stapel', 'asym'],
   },
   {
     id: 'paviljoen', naam: 'Paviljoen',
@@ -85,7 +85,7 @@ export const MASSAS = {
   },
   stapel: {
     naam: 'gestapelde volumes', zin: 'twee gestapelde dozen met een verspringende uitkraging',
-    kan: s => s.lagen === 2,
+    kan: s => s.lagen === 2 && s.plat,
   },
 }
 
@@ -151,6 +151,96 @@ export const ELEMENTEN = {
   entreeKader: {
     zin: 'teruggelegde entree in een contrasterend kader',
     kan: () => true, sluit: ['entreeLuifel'],
+  },
+}
+
+// ---------------------------------------------------------------------
+// Herijkte compositieregels, afgeleid uit de 13 geslaagde nabouwsels op
+// /kalibratie. Vakmansregels gelden als harde ondergrens: kaders volgen
+// de daklijn, raamstroken lopen van plint tot goot, een balkon vraagt
+// een pui erachter, en per kopgevel is er precies een dominant thema.
+
+// Dominante kopgevel-thema's (er wordt er altijd precies een gekozen)
+export const KOPTHEMAS = {
+  puiStrak: { gewicht: 3, zin: 'een strakke glazen kopgevel', kan: () => true },
+  puiKader: { gewicht: 3, zin: 'een kader langs de daklijn rond de pui', kan: s => s.massa !== 'stapel' },
+  puiLamellen: { gewicht: 2, zin: 'houten lamellen voor de vide', kan: s => !s.plat && s.massa !== 'stapel' },
+  puiPenanten: { gewicht: 2, zin: 'houten penanten in de pui', kan: s => !s.plat && s.massa !== 'stapel' },
+  portaal: { gewicht: 2, zin: 'een portaalkader dat de dakcontour tot de grond doortrekt', kan: (s, p) => !s.plat && s.massa === 'enkel' && p.kavel - s.voet >= 80 },
+  lamellenVeld: { gewicht: 2, zin: 'een lamellenveld voor de verdiepingspui', kan: s => s.plat && s.lagen === 2 },
+}
+
+// Secundaire elementen (een of twee per variant, gedoseerd)
+export const SECUNDAIR = {
+  balkon: {
+    gewicht: 2, zin: 'een balkon met spijlenbalustrade voor de pui',
+    kan: s => s.lagen === 2 && ['puiStrak', 'puiKader', 'puiPenanten'].includes(s.kopThema) && s.massa !== 'stapel',
+    sluit: ['erker'],
+  },
+  veranda: {
+    gewicht: 2, zin: 'het dakvlak doorgetrokken als veranda op stalen kolommen',
+    kan: (s, p) => !s.plat && s.kopThema !== 'portaal' && p.kavel - s.voet >= 120,
+    sluit: ['zijLuifel', 'entreeLuifel'],
+  },
+  zijLuifel: {
+    gewicht: 1, zin: 'een zijwaarts doorgetrokken dakvlak met schijfwand',
+    kan: (s, p) => !s.plat && s.massa === 'enkel' && p.kavel - s.voet >= 100,
+    sluit: ['veranda'],
+  },
+  aanbouw: {
+    gewicht: 2, zin: 'een geschakelde berging met doorgestoken luifel',
+    kan: (s, p) => s.massa !== 'stapel' && p.kavel - s.voet >= 200,
+    sluit: ['bijgebouw'],
+  },
+  bijgebouw: {
+    gewicht: 1, zin: 'een losse berging met carport',
+    kan: (s, p) => p.kavel - s.voet >= 300,
+    sluit: ['aanbouw'],
+  },
+  plint: {
+    gewicht: 1, zin: 'een materiaalwissel per laag',
+    kan: s => s.lagen === 2 && !s.plat && s.massa === 'enkel',
+    sluit: [],
+  },
+  dakramen: {
+    gewicht: 1, zin: 'dakramen in het dakvlak',
+    kan: s => !s.plat && s.lagen === 2,
+    sluit: ['dakkapel'],
+  },
+  dakkapel: {
+    gewicht: 1, zin: 'een dakkapel in het dakvlak',
+    kan: s => !s.plat && s.lagen === 2 && s.helling >= 45 && ['enkel', 'asym'].includes(s.massa),
+    sluit: ['dakramen'],
+  },
+  dakOpbouw: {
+    gewicht: 1, zin: 'een kleine dakopbouw',
+    kan: s => s.plat && s.massa === 'enkel',
+    sluit: [],
+  },
+  lamellenEntree: {
+    gewicht: 1, zin: 'een lamellenveld boven de entree',
+    kan: s => s.lagen === 2 && !s.plat && s.kopThema !== 'puiLamellen',
+    sluit: [],
+  },
+  schoorsteen: {
+    gewicht: 1, zin: 'een gemetseld schoorsteenmassief door de nok',
+    kan: s => !s.plat,
+    sluit: [],
+  },
+  erker: {
+    gewicht: 1, zin: 'een uitstekende glazen erker op de hoek',
+    kan: s => !s.plat && s.massa !== 'stapel',
+    sluit: ['balkon'],
+  },
+  entreeKader: {
+    gewicht: 1, zin: 'een teruggelegde entree in een contrasterend kader',
+    kan: s => s.kopThema !== 'portaal',
+    sluit: ['entreeLuifel'],
+  },
+  entreeLuifel: {
+    gewicht: 1, zin: 'een entreeluifel op slanke stalen kolommen',
+    kan: s => s.kopThema !== 'portaal',
+    sluit: ['entreeKader', 'veranda'],
   },
 }
 
