@@ -8,8 +8,8 @@ import { randYOp, clipLat, clipVlak } from './geometrie.js'
 const MAT = {
   // metalness laag houden: zonder environment-map reflecteert metaal zwart
   kozijn: new THREE.MeshStandardMaterial({ color: STAEL.kozijnKleur, roughness: .5, metalness: .2 }),
-  // licht reflecterend blauwgrijs glas, geen zwart gat
-  glas: new THREE.MeshStandardMaterial({ color: '#46586a', roughness: .08, metalness: .25 }),
+  // licht reflecterend blauwgrijs glas, ook onder schuine hoeken leesbaar
+  glas: new THREE.MeshStandardMaterial({ color: '#4c5c6b', roughness: .14, metalness: .08 }),
   staal: new THREE.MeshStandardMaterial({ color: '#26262a', roughness: .45, metalness: .35 }),
   gras: new THREE.MeshStandardMaterial({ color: '#3a4630', roughness: 1 }),
   terras: new THREE.MeshStandardMaterial({ color: '#6e685d', roughness: .95 }),
@@ -63,9 +63,15 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
     <group>
       {zijden.map((zi, i) => {
         const dx = zi.tot[0] - zi.van[0], dy = zi.tot[1] - zi.van[1]
-        let len = Math.hypot(dx, dy) + overstek * 1.4
+        const n0 = Math.hypot(dx, dy) || 1
+        let len = n0 + overstek * 1.4
         const hoek = Math.atan2(dy, dx)
         let cx = (zi.van[0] + zi.tot[0]) / 2, cy = (zi.van[1] + zi.tot[1]) / 2
+        // het overstek zit alleen aan de gootzijde: de plaat eindigt
+        // exact op de nok
+        const gx = (zi.kant === -1 ? zi.van[0] - zi.tot[0] : zi.tot[0] - zi.van[0]) / n0
+        const gy = (zi.kant === -1 ? zi.van[1] - zi.tot[1] : zi.tot[1] - zi.van[1]) / n0
+        cx += gx * overstek * .7; cy += gy * overstek * .7
         // zijwaarts doorgetrokken dakvlak (zijLuifel): een dakvlak loopt
         // langs zijn helling door voorbij de gevel, met schijfwand eronder
         if (zijLuifel && zijLuifel.kant === zi.kant) {
@@ -83,10 +89,17 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
           </mesh>
         )
       })}
-      {/* nokkap en gootranden: aansluitingen zichtbaar dicht */}
-      <mesh material={mat} position={[nokOffset, nok + dikte * 1.15, zMid]}>
-        <boxGeometry args={[.34 + dikte, .12, diepte]} />
-      </mesh>
+      {/* nok dicht: bij dun dak een nokkap, bij een dik dakpakket een
+          vouwblok dat de ontmoeting van de twee platen vult */}
+      {dikte < .3 ? (
+        <mesh material={mat} position={[nokOffset, nok + dikte * 1.15, zMid]}>
+          <boxGeometry args={[.34 + dikte, .12, diepte]} />
+        </mesh>
+      ) : (
+        <mesh material={mat} position={[nokOffset, nok + dikte * .55, zMid]}>
+          <boxGeometry args={[dikte * 2.3, dikte * 1.5, diepte]} />
+        </mesh>
+      )}
       {[-1, 1].map(k => (
         <mesh key={'goot' + k} material={mat} position={[k * (b / 2 + overstek * .55), goot + .04, zMid]}>
           <boxGeometry args={[.16, .16, diepte]} />
@@ -425,7 +438,7 @@ function KopGevelDicht({ b, goot, nok, nokOffset = 0, z, kaderKleur }) {
   const raam = (x, y, w, h, key) => (
     <group key={key} position={[x, y, .05]}>
       <mesh material={MAT.glas}><planeGeometry args={[w, h]} /></mesh>
-      <mesh material={MAT.kozijn} position={[0, 0, -.015]}>
+      <mesh material={MAT.kozijn} position={[0, 0, -.045]}>
         <boxGeometry args={[w + .14, h + .14, .03]} />
       </mesh>
     </group>
@@ -684,7 +697,7 @@ function GlasPanelen({ spec }) {
       )
     } else {
       binnen.push(
-        <mesh key="vlak" material={MAT.kozijn} position={[0, 0, -.02]}>
+        <mesh key="vlak" material={MAT.kozijn} position={[0, 0, -.055]}>
           <boxGeometry args={[p.w + dik * 2, p.h + dik * 2, .05]} />
         </mesh>
       )
