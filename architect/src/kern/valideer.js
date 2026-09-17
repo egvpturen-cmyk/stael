@@ -111,6 +111,101 @@ export function schilFouten(model, opties = {}) {
   return fouten
 }
 
+// ELEMENT-AFHEID: elk element heeft logische einden (dakcontour, kader,
+// pui, plint, maaiveld of een ander element), lineaire elementen komen
+// in knooppunten samen, een balkon is bereikbaar (deur in de pui) en
+// een paneel heeft een functie. Niet-af is nooit een optie.
+export function elementFouten(model) {
+  const fouten = []
+  for (const wand of model.wanden) {
+    const vol = wandVol(wand, model.volumes.find(v => v.id === wand.volumeId))
+    const ketens = new Map()
+    for (const el of wand.elementen || []) {
+      if (el.bekleding) continue
+      // 1. elk element declareert zijn rol en zijn grenzen; een element
+      // zonder gedefinieerde functie of einden is per definitie niet af
+      if (!el.rol) {
+        fouten.push(wand.id + ': element zonder gedefinieerde rol of einden (niet af)')
+        continue
+      }
+      if (el.rol === 'lamel') {
+        // latten lopen individueel door tot hun veldgrens
+        for (const [u, v] of [el.van, el.tot]) {
+          let ok = false
+          if (el.grens === 'dakcontour') {
+            // de modelmarge is .12 vanaf de contour; toets ruimer zodat
+            // een correct geclipte lat nooit op afronding faalt
+            const ber = kopBereikVan(v, vol)
+            ok = ber && (Math.abs(u - ber[0]) < .17 || Math.abs(u - ber[1]) < .17)
+          }
+          if (!ok && el.grens === 'kader') {
+            // geometrisch: het lat-einde raakt een kaderstijl of de
+            // dakcontour binnen het kader
+            ok = (wand.elementen || []).some(k => k.rol === 'kader' && k.type === 'blok'
+              && Math.abs(k.u - u) < (k.b / 2) + .12)
+            if (!ok) {
+              const ber = kopBereikVan(v, vol)
+              ok = ber && (Math.abs(u - ber[0]) < .4 || Math.abs(u - ber[1]) < .4)
+            }
+          }
+          if (!ok && el.grens === 'pui') {
+            ok = wand.sparingen.some(sp => {
+              const pts = sp.poly || []
+              const us = pts.map(q => q[0])
+              return pts.length && (Math.abs(u - Math.min(...us)) < .15 || Math.abs(u - Math.max(...us)) < .15)
+            })
+          }
+          if (!ok) fouten.push(wand.id + ': lamel eindigt zwevend op u=' + u.toFixed(2) + ' v=' + v.toFixed(2))
+        }
+      }
+      if (el.keten != null) {
+        if (!ketens.has(el.keten)) ketens.set(el.keten, [])
+        ketens.get(el.keten).push(el)
+      }
+      if (el.rol === 'paneel') {
+        const okPoort = el.functie === 'poort' && el.v0 <= .03 && el.v1 - el.v0 >= 2.0 && el.b >= .85
+        const okRitme = el.functie === 'ritmevak' && (wand.ritmeUs || []).some(ru => Math.abs(ru - el.u) < .08)
+        if (!okPoort && !okRitme)
+          fouten.push(wand.id + ': paneel zonder functie (geen poort en niet in het stramien)')
+      }
+      if (el.type === 'balkon') {
+        const deur = wand.sparingen.some(sp => sp.deur
+          && sp.deur.b >= .8
+          && Math.abs(sp.deur.dorpel - el.vloer) <= .08
+          && sp.deur.u > el.u - el.breedte / 2 - .1 && sp.deur.u < el.u + el.breedte / 2 + .1)
+        if (!deur) fouten.push(wand.id + ': balkon zonder deur in de pui erachter (onbereikbaar)')
+      }
+    }
+    // 2. lineaire ketens: opeenvolgende segmenten delen hun knooppunt,
+    // keteneinden liggen op maaiveld of een gedeclareerde grens
+    for (const [ketenId, delen] of ketens) {
+      const gesorteerd = delen.slice().sort((a, b) => a.knoopIndex - b.knoopIndex)
+      for (let i = 0; i < gesorteerd.length - 1; i++) {
+        const a = gesorteerd[i], b = gesorteerd[i + 1]
+        const eindA = a.tot || [a.u, a.v1]
+        const beginB = b.van || [b.u, b.v0]
+        if (Math.hypot(eindA[0] - beginB[0], eindA[1] - beginB[1]) > .03)
+          fouten.push(wand.id + ': keten ' + ketenId + ' heeft een open knoop tussen deel ' + i + ' en ' + (i + 1))
+      }
+      const eerste = gesorteerd[0], laatste = gesorteerd[gesorteerd.length - 1]
+      const begin = eerste.van || [eerste.u, eerste.v0]
+      const eind = laatste.tot || [laatste.u, laatste.v1]
+      for (const p of [begin, eind]) {
+        if (p[1] > .03) fouten.push(wand.id + ': keten ' + ketenId + ' eindigt zwevend op v=' + p[1].toFixed(2))
+      }
+    }
+  }
+  return fouten
+}
+
+function kopBereikVan(v, vol) {
+  const { b, goot, nok, nokOffset } = vol
+  if (vol.plat || v <= goot) return [-b / 2, b / 2]
+  if (v >= nok) return null
+  const f = (v - goot) / (nok - goot)
+  return [-b / 2 + f * (nokOffset + b / 2), b / 2 - f * (b / 2 - nokOffset)]
+}
+
 export function valideerModel(model, opties = {}) {
   const fouten = []
   const volVan = w => model.volumes.find(v => v.id === w.volumeId)
@@ -236,7 +331,10 @@ export function valideerModel(model, opties = {}) {
   if (kop && staart && staart.nok > kop.nok - .35)
     fouten.push('kop-en-staart: staartnok (' + staart.nok.toFixed(2) + ') komt te dicht bij de kopnok (' + kop.nok.toFixed(2) + ')')
 
-  // 6. gesloten schil op de definitieve geometrie
+  // 6. element-afheid
+  fouten.push(...elementFouten(model))
+
+  // 7. gesloten schil op de definitieve geometrie
   fouten.push(...schilFouten(model, opties))
 
   return fouten

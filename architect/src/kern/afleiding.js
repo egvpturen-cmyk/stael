@@ -78,6 +78,29 @@ export function leidGeometrieAf(model, opties = {}) {
             ry: t.ry, rz: 0, size: [.07, vTop - pts[0][1] - .06, .14],
           })
         }
+        if (sp.deur) {
+          // te openen deel in de pui: dubbel kozijnprofiel rondom het
+          // deurvak plus een dorpelregel op de balkonvloer
+          const dr = sp.deur
+          const kaders = [
+            [dr.u - dr.b / 2, dr.dorpel + dr.h / 2, .09, dr.h],
+            [dr.u + dr.b / 2, dr.dorpel + dr.h / 2, .09, dr.h],
+          ]
+          for (const [u, v, w, h] of kaders) {
+            prims.push({
+              vorm: 'box', rol: 'kozijn', kleur: K.kozijn,
+              pos: naarWereld(t, [u, v, WAND_DIKTE / 2 + .02]),
+              ry: t.ry, rz: 0, size: [w, h, .16],
+            })
+          }
+          for (const v of [dr.dorpel, dr.dorpel + dr.h]) {
+            prims.push({
+              vorm: 'box', rol: 'kozijn', kleur: K.kozijn,
+              pos: naarWereld(t, [dr.u, v, WAND_DIKTE / 2 + .02]),
+              ry: t.ry, rz: 0, size: [dr.b + .09, .1, .16],
+            })
+          }
+        }
       }
     }
     for (const el of wand.elementen || []) {

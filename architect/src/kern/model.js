@@ -14,6 +14,21 @@ import { STAELDETAILS } from './staeldetails.js'
 
 export const WAND_DIKTE = .28
 
+// Ontmoetingsregister: er zijn geen voorkeurswetten over WELK detail
+// gebruikt wordt; elke optie hieronder is geldig. De enige wet is dat
+// elke ontmoeting van bouwdelen precies EEN gekozen, volledig
+// uitgevoerde detailoplossing heeft. De generator kiest per variant,
+// de validatie eist de complete uitvoering.
+export const ONTMOETINGSOPTIES = {
+  nok: ['nokvouw'],
+  kil: ['kilkeper'],
+  gootrand: ['verholen', 'randprofiel'],
+  koprand: ['boeikop', 'windveer', 'portaal', 'wandcontact'],
+  dakwand: ['ingewerkt', 'aansluitprofiel'],
+  keperskop: ['zicht', 'afgedekt'],
+  platrand: ['daklijst', 'wandcontact'],
+}
+
 export function kernRng(seed) {
   let a = seed >>> 0
   return () => {
@@ -32,6 +47,13 @@ export function wandVol(wand, vol) {
   if (wand.type === 'kop' && wand.richting === -1 && vol.nokOffset)
     return { ...vol, nokOffset: -vol.nokOffset }
   return vol
+}
+
+// wand-lokale u voor een wereldcoordinaat langs de gevel: langs+ en
+// kop- zijn in hun eigen stelsel gespiegeld
+export function wandLokaalU(wand, wereld) {
+  if (wand.type === 'langs') return wand.kant === 1 ? -wereld : wereld
+  return wand.richting === -1 ? -wereld : wereld
 }
 
 // hoogte van de onderzijde van het dakpakket op kopgevel-positie u
@@ -289,8 +311,12 @@ export function bouwModel(p) {
     const hoofdLangs = m.kant === 1 ? 'hoofd:langs+' : 'hoofd:langs-'
     const wz = wand(hoofdLangs) || wand('staart:langs' + (m.kant === 1 ? '+' : '-'))
     if (wz) {
-      // masker in langs-lokaal (u = z): aanbouwzone tot aanbouwhoogte
-      wz.maskers.push({ poly: [[zA - dA / 2, 0], [zA + dA / 2, 0], [zA + dA / 2, hA], [zA - dA / 2, hA]], reden: 'contact met aanbouw' })
+      // masker in wand-lokale coordinaten (langs+ is gespiegeld)
+      const uA = wandLokaalU(wz, zA)
+      wz.maskers.push({
+        poly: [[uA - dA / 2, 0], [uA + dA / 2, 0], [uA + dA / 2, hA], [uA - dA / 2, hA]],
+        reden: 'contact met aanbouw',
+      })
     }
     verwijderRand(model, 'aanbouw', r => r.type === 'daklijst' && r.rand === (m.kant === 1 ? 'langs-' : 'langs+'))
   }
@@ -322,6 +348,7 @@ export function bouwModel(p) {
       const gast = wand(doelVol.id + ':langs' + (kant === 1 ? '+' : '-'))
       const top = doelVol.goot - .35
       if (top - plintH < .5) continue
+      gast.ritmeUs = []
       for (let i = 0; i < r.n; i++) {
         const u = -doelVol.d / 2 + doelVol.d * ((i + .5) / r.n)
         // niet in een contactzone (aanbouw) plaatsen
@@ -330,6 +357,7 @@ export function bouwModel(p) {
           return u > Math.min(...us) - .6 && u < Math.max(...us) + .6
         })
         if (inMasker) continue
+        gast.ritmeUs.push(u)
         gast.sparingen.push({
           id: gast.id + '-raam-' + i, type: 'raam',
           rect: { u, v: plintH, w: r.w ?? .9, h: top - plintH },
@@ -348,18 +376,30 @@ export function bouwModel(p) {
     const dakY = u => dakOnderY(u, gv)
     const kleur = e.kleur || null
     if (e.type === 'kader' && !gv.plat) {
+      // het kader is een keten: hartlijn-polyline van maaiveld over de
+      // daklijn naar maaiveld, met gedeelde knooppunten (element-afheid)
       const dik = e.dik ?? .28, uitst = .05
-      for (const kant of [1, -1]) {
-        const u = kant * (gv.b / 2 - dik / 2)
-        gast.elementen.push({ type: 'blok', u, v0: 0, v1: dakY(kant * gv.b / 2) - .02, b: dik, diep: .22, uit: uitst, kleur })
-      }
-      const stukken = gv.nok > gv.goot
-        ? [[-gv.b / 2 + dik, gv.nokOffset], [gv.nokOffset, gv.b / 2 - dik]] : []
-      for (const [u1, u2] of stukken) {
-        gast.elementen.push({
-          type: 'strook', van: [u1, dakY(u1) - .13], tot: [u2, dakY(u2) - .13],
-          b: .24, diep: .22, uit: uitst, kleur,
-        })
+      const x0 = gv.b / 2 - dik / 2
+      // knopen op de hoogte van de BUITENrand van de stijl, zodat geen
+      // enkele hoek van de keten door de daklijn steekt
+      const overhang = Math.max(dakY(-x0) - dakY(-gv.b / 2), dakY(x0) - dakY(gv.b / 2), 0)
+      const knopen = [[-x0, 0], [-x0, dakY(-gv.b / 2) - .12]]
+      if (gv.nok > gv.goot) knopen.push([gv.nokOffset, dakY(gv.nokOffset) - .12 - overhang])
+      knopen.push([x0, dakY(gv.b / 2) - .12], [x0, 0])
+      const keten = gast.id + '-kader'
+      for (let i = 0; i < knopen.length - 1; i++) {
+        const [u1, v1] = knopen[i], [u2, v2] = knopen[i + 1]
+        const verticaal = Math.abs(u2 - u1) < .01
+        gast.elementen.push(verticaal
+          ? {
+            type: 'blok', rol: 'kader', keten, knoopIndex: i,
+            van: [u1, Math.min(v1, v2) === 0 && i === 0 ? 0 : v1], tot: [u2, v2],
+            u: u1, v0: Math.min(v1, v2), v1: Math.max(v1, v2), b: dik, diep: .22, uit: uitst, kleur,
+          }
+          : {
+            type: 'strook', rol: 'kader', keten, knoopIndex: i,
+            van: [u1, v1], tot: [u2, v2], b: .24, diep: .22, uit: uitst, kleur,
+          })
       }
     }
     if (e.type === 'penanten') {
@@ -368,35 +408,88 @@ export function bouwModel(p) {
       for (let i = 1; i <= n; i++) {
         const u = (e.u ?? 0) - span / 2 + (span / (n + 1)) * i
         const v1 = Math.min(e.hMax ?? 1e9, dakY(u) - .15)
-        if (v1 > .4) gast.elementen.push({ type: 'blok', u, v0: .05, v1, b: e.b ?? .4, diep: .24, uit: .04, kleur })
+        if (v1 > .4) gast.elementen.push({ type: 'blok', rol: 'penant', u, v0: .05, v1, b: e.b ?? .4, diep: .24, uit: .04, kleur })
       }
     }
     if (e.type === 'lamellenveld') {
+      // elke lat loopt individueel door tot de veldgrens: de dakcontour,
+      // het kader of de puirand (element-afheid, geen zwevende einden)
+      const grens = e.grens || (kop && !gv.plat ? 'dakcontour' : 'pui')
+      const kaderDik = .28
       for (let v = e.v0; v <= e.v1; v += e.stap ?? .3) {
-        let u0 = (e.u ?? 0) - e.breedte / 2, u1 = (e.u ?? 0) + e.breedte / 2
-        if (kop) {
-          const ber = kopBereik(v, gv, .15)
+        let u0, u1
+        if (grens === 'dakcontour' && kop && !gv.plat) {
+          const ber = kopBereik(v, gv, .12)
           if (!ber) continue
-          u0 = Math.max(u0, ber[0]); u1 = Math.min(u1, ber[1])
-        } else if (v > gv.goot - .15) continue
+          u0 = ber[0]; u1 = ber[1]
+        } else if (grens === 'kader') {
+          const rand = gv.b / 2 - kaderDik + .02
+          const ber = !gv.plat ? kopBereik(v, gv, kaderDik - .02) : [-rand, rand]
+          if (!ber) continue
+          u0 = Math.max(-rand, ber[0]); u1 = Math.min(rand, ber[1])
+        } else {
+          // puirand tot puirand
+          const pui = gast.sparingen.find(sp => sp.poly)
+          if (!pui || v > gv.goot + 2.5) continue
+          const us = pui.poly.map(q => q[0])
+          u0 = Math.min(...us); u1 = Math.max(...us)
+        }
         if (u1 - u0 > .25) gast.elementen.push({
-          type: 'strook', van: [u0, v], tot: [u1, v], b: .07, diep: .16, uit: e.uit ?? .12, kleur,
+          type: 'strook', rol: 'lamel', grens, van: [u0, v], tot: [u1, v],
+          b: .07, diep: .16, uit: e.uit ?? .12, kleur,
         })
       }
     }
     if (e.type === 'paneel') {
-      let v1 = e.v + e.h
-      if (kop) v1 = Math.min(v1, Math.min(dakY(e.u - e.b / 2), dakY(e.u + e.b / 2)) - .12)
-      else v1 = Math.min(v1, gv.goot - .1)
-      const grens = (kop ? gv.b : gv.d) / 2 - .1
-      const u = Math.max(-(grens - e.b / 2), Math.min(grens - e.b / 2, e.u))
-      if (v1 - e.v > .25) gast.elementen.push({ type: 'blok', u, v0: e.v, v1, b: e.b, diep: .06, uit: e.uit ?? .05, kleur })
+      // een paneel heeft een functie: een dichtgezet vak in het
+      // raamstramien, of een poort op maaiveld; kale platen bestaan niet
+      const functie = e.functie || 'ritmevak'
+      if (functie === 'ritmevak') {
+        const ritme = gast.ritmeUs || []
+        if (ritme.length) {
+          const u = ritme.reduce((a, b2) => Math.abs(b2 - e.u) < Math.abs(a - e.u) ? b2 : a)
+          const raam = gast.sparingen.find(sp => sp.rect && Math.abs(sp.rect.u - u) < .05)
+          if (raam) {
+            gast.sparingen = gast.sparingen.filter(sp => sp !== raam)
+            gast.elementen.push({
+              type: 'blok', rol: 'paneel', functie, u,
+              v0: raam.rect.v, v1: raam.rect.v + raam.rect.h,
+              b: raam.rect.w, diep: .06, uit: .03, kleur,
+            })
+          }
+        }
+      } else {
+        const grens = (kop ? gv.b : gv.d) / 2 - .8
+        const u = Math.max(-grens, Math.min(grens, e.u))
+        const h = Math.max(2.2, Math.min(e.h ?? 2.3, (kop ? dakY(u) : gv.goot) - .3))
+        gast.elementen.push({
+          type: 'blok', rol: 'paneel', functie: 'poort', u, v0: 0, v1: h,
+          b: Math.max(.9, e.b ?? 1), diep: .06, uit: .03, kleur,
+        })
+      }
     }
     if (e.type === 'balkon') {
-      gast.elementen.push({
-        type: 'balkon', u: e.u ?? 0, breedte: Math.min(e.breedte ?? 3, gv.b - 1),
-        vloer: e.vloer ?? 2.85, diepte: e.diepte ?? 1.5,
-      })
+      // een balkon is alleen bereikbaar met een deur in de pui erachter:
+      // het model zet het deurvak, of laat het balkon vervallen
+      const vloer = e.vloer ?? 2.85
+      const u = e.u ?? 0
+      const breedte = Math.min(e.breedte ?? 3, gv.b - 1)
+      const pui = gast.sparingen.find(sp => sp.poly)
+      if (pui) {
+        const us = pui.poly.map(q => q[0])
+        const deurU = Math.max(Math.min(...us) + .55, Math.min(Math.max(...us) - .55, u))
+        // puihoogte op de deurpositie zelf (de pui volgt de dakcontour)
+        let top = Math.max(...pui.poly.map(q => q[1]))
+        for (let i = 2; i < pui.poly.length - 1; i++) {
+          const [u1, v1] = pui.poly[i], [u2, v2] = pui.poly[i + 1]
+          if (deurU >= Math.min(u1, u2) && deurU <= Math.max(u1, u2) && Math.abs(u2 - u1) > .001)
+            top = v1 + (v2 - v1) * ((deurU - u1) / (u2 - u1))
+        }
+        if (top > vloer + 2.45) {
+          pui.deur = { u: deurU, b: .95, dorpel: vloer, h: 2.3 }
+          gast.elementen.push({ type: 'balkon', rol: 'balkon', u, breedte, vloer, diepte: e.diepte ?? 1.5 })
+        }
+      }
     }
   }
 

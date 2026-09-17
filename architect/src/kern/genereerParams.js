@@ -26,21 +26,25 @@ export function willekeurigeParams(seed) {
   }
 
   if (r() < .3) params.plint = { h: .6 + r() * 1.2, kleur: '#b09a72' }
-  if (r() < .3) params.gevelElementen.push({ wand: 'kop+', type: 'kader', kleur: '#26262a' })
-  if (r() < .25) params.gevelElementen.push({
-    wand: 'kop+', type: 'lamellenveld', u: (r() - .5) * b * .2,
-    breedte: b * (.4 + r() * .3), v0: goot + .3, v1: goot + 1.2 + r() * 2.5, kleur: '#84705a',
+  // elementtypen geforceerd aanwezig in een deel van de varianten,
+  // zodat de massatest alle element-afheidsregels blijft raken
+  const blok = seed % 5
+  const heeftKader = blok === 0 || r() < .2
+  if (heeftKader) params.gevelElementen.push({ wand: 'kop+', type: 'kader', kleur: '#26262a' })
+  if (blok === 0 || r() < .2) params.gevelElementen.push({
+    wand: 'kop+', type: 'lamellenveld', grens: heeftKader ? 'kader' : 'dakcontour',
+    v0: goot + .3, v1: goot + 1.2 + r() * 2.5, kleur: '#84705a',
   })
-  if (r() < .2) {
-    // balkon vraagt een pui erachter: alleen als de vloer onder de puitop ligt
+  if (blok === 1 || r() < .15) {
     const vloer = 2.5 + r() * .6
     if (vloer < goot + 1.2) params.gevelElementen.push({ wand: 'kop+', type: 'balkon', u: 0, breedte: Math.min(3, puiBreedte - .4), vloer, diepte: 1.2 + r() * .5 })
   }
-  if (r() < .25) params.gevelElementen.push({
+  if (blok === 2 || r() < .15) params.gevelElementen.push({
     wand: r() < .5 ? 'langs-' : 'langs+', type: 'paneel',
-    u: (r() - .5) * d * .5, v: .2, h: 1.5 + r() * 1.5, b: 1 + r() * .8, kleur: '#d8d4c9',
+    functie: r() < .55 ? 'ritmevak' : 'poort',
+    u: (r() - .5) * d * .5, h: 2.2 + r() * .4, b: 1 + r() * .5, kleur: '#d8d4c9',
   })
-  if (r() < .25) params.gevelElementen.push({
+  if (blok === 3 || r() < .15) params.gevelElementen.push({
     wand: 'kop+', type: 'penanten', n: 2 + Math.floor(r() * 3), b: .35 + r() * .2,
     span: puiBreedte * .8, hMax: goot + .4, kleur: '#77644c',
   })

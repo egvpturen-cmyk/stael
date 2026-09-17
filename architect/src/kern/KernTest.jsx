@@ -87,9 +87,9 @@ export default function KernTest() {
     plint: { h: .95, kleur: '#b09a72' },
     gevelElementen: [
       { wand: 'kop+', type: 'kader', kleur: '#26262a' },
-      { wand: 'kop+', type: 'lamellenveld', u: 0, breedte: 4.6, v0: 3.5, v1: 5.4, kleur: '#84705a' },
+      { wand: 'kop+', type: 'lamellenveld', grens: 'kader', v0: 3.5, v1: 5.4, kleur: '#84705a' },
       { wand: 'kop+', type: 'balkon', u: 0, breedte: 3, vloer: 2.9, diepte: 1.4 },
-      { wand: 'langs-', type: 'paneel', u: 2.5, v: .2, h: 2.4, b: 1.4, kleur: '#d8d4c9' },
+      { wand: 'langs-', type: 'paneel', functie: 'ritmevak', u: 2.5, kleur: '#d8d4c9' },
     ],
   })
   const v2 = stap2.model.volumes[0]
