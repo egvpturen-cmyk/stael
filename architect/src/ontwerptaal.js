@@ -231,6 +231,11 @@ export const SECUNDAIR = {
     kan: s => !s.plat,
     sluit: [],
   },
+  pergola: {
+    gewicht: 1, zin: 'een pergola-lamellendak op stalen kolommen tegen de gevel',
+    kan: (s, p) => p.kavel - s.voet >= 80,
+    sluit: ['veranda', 'zijLuifel'],
+  },
   erker: {
     gewicht: 1, zin: 'een uitstekende glazen erker op de hoek',
     kan: s => !s.plat && s.massa !== 'stapel',

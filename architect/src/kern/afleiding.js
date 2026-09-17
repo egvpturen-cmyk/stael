@@ -356,13 +356,15 @@ export function leidGeometrieAf(model, opties = {}) {
     }
     if (rand.type === 'pergola') {
       // open lamellendak: kolommen buiten, twee liggers, lamellen die
-      // exact van ligger tot ligger spannen (element-afheid per constructie)
+      // exact van ligger tot ligger spannen (element-afheid per
+      // constructie); op een dakterras staan de kolommen op het terras
       const x0 = rand.kant * vol.b / 2
       const x1 = rand.kant * (vol.b / 2 + rand.diepte)
       const y = rand.h
+      const y0v = rand.basis || 0
       const kp = '#26262a'
       for (const z of [rand.z0 + .12, rand.z1 - .12]) {
-        prims.push({ vorm: 'box', rol: 'kolom', kleur: kp, pos: volNaarWereld(vol, x1 - rand.kant * .07, y / 2, z), ry: vol.ry || 0, rz: 0, size: [.14, y, .14] })
+        prims.push({ vorm: 'box', rol: 'kolom', kleur: kp, pos: volNaarWereld(vol, x1 - rand.kant * .07, (y0v + y) / 2, z), ry: vol.ry || 0, rz: 0, size: [.14, y - y0v, .14] })
       }
       for (const lx of [x0 + rand.kant * .06, x1 - rand.kant * .07]) {
         prims.push({ vorm: 'box', rol: 'pergola', kleur: kp, pos: volNaarWereld(vol, lx, y - .09, (rand.z0 + rand.z1) / 2), ry: (vol.ry || 0) + Math.PI / 2, rz: 0, size: [rand.z1 - rand.z0, .18, .08] })

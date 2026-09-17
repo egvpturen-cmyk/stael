@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
-import { genereerVarianten } from './generator.js'
+import { genereerKernVarianten } from './kern/klantgenerator.js'
 import { REGELS_DEFAULT } from './ontwerptaal.js'
-import Woning3D from './Woning3D.jsx'
+import KernCanvas from './kern/KernWoning.jsx'
 
 const START = {
   kavel: 800,
@@ -44,12 +44,12 @@ function Keuze({ label, opties, waarde, onChange }) {
   )
 }
 
-function VariantKaart({ v, naam, prog, favoriet, opFavoriet, opGroot }) {
+function VariantKaart({ v, naam, favoriet, opFavoriet, opGroot }) {
   return (
     <article className={'variant' + (favoriet ? ' favoriet' : '')}>
       {favoriet && <span className="keuzelabel">Jouw keuze</span>}
       <div className="canvasvak">
-        <Woning3D spec={v} programma={prog} />
+        <KernCanvas model={v.model} camera={v.kijk} />
       </div>
       <div className="variantinfo">
         <h3>{naam}</h3>
@@ -80,7 +80,7 @@ export default function App() {
   const [favoriet, zetFavoriet] = useState(null)
   const [laden, zetLaden] = useState(false)
 
-  const varianten = useMemo(() => genereerVarianten(prog, ronde), [prog, ronde])
+  const varianten = useMemo(() => genereerKernVarianten(prog, ronde), [prog, ronde])
   const zet = deel => { zetProg(p => ({ ...p, ...deel })); zetRonde(0) }
   const zetRegel = deel => { zetProg(p => ({ ...p, regels: { ...p.regels, ...deel } })); zetRonde(0) }
 
@@ -162,7 +162,7 @@ export default function App() {
         <div className="grootvak" role="dialog" aria-label={groot.naam}>
           <button type="button" className="sluit" onClick={() => zetGroot(null)}>Sluiten ×</button>
           <div className="grootcanvas">
-            <Woning3D spec={groot} programma={prog} groot />
+            <KernCanvas model={groot.model} camera={{ ...groot.kijk, fov: 36 }} />
           </div>
           <p className="groottitel">{groot.naam} · goot {groot.goot.toFixed(1)} m · nok {groot.nok.toFixed(1)} m</p>
         </div>

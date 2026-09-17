@@ -481,6 +481,22 @@ export function bouwModel(p) {
           rect: { u: 0, v: basis + .1, w: .95, h: Math.min(2.3, h2 - .32) },
         })
         maakTerras(onder.vol)
+        // pergola-lamellendak op het terras, tegen de bovendoosgevel,
+        // met de kolommen op het terras zelf
+        if (m.pergola) {
+          const pk = m.pergola.kant === -1 ? -1 : 1
+          const inzet = pk === 1 ? rOnder.x1 - rBoven.x1 : rBoven.x0 - rOnder.x0
+          if (inzet >= 1.3) {
+            const pDiepte = Math.max(1, Math.min(m.pergola.diepte ?? inzet - .3, inzet - .25))
+            const pBreedte = Math.max(2, Math.min(m.pergola.breedte ?? d2 - .4, d2 - .3))
+            const pz = Math.max(-d2 / 2 + pBreedte / 2 + .1, Math.min(d2 / 2 - pBreedte / 2 - .1, m.pergola.z ?? 0))
+            model.randafwerking.push({
+              type: 'pergola', volumeId: 'boven', kant: pk,
+              z0: pz - pBreedte / 2, z1: pz + pBreedte / 2,
+              diepte: pDiepte, h: basis + Math.min(2.6, h2 - .3), basis, hoh: .45,
+            })
+          }
+        }
       }
     }
     if (m.opbouw) maakTerras(boven.vol)

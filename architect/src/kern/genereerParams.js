@@ -93,6 +93,7 @@ export function willekeurigeParams(seed) {
       terras: r() < .8,
     }
     if (r() < .4) params.massa.opbouw = { b: 2 + r() * 1.4, d: 1.8 + r() * 1.2, h: 2.5 + r() * .4 }
+    if (params.massa.terras && r() < .3) params.massa.pergola = { kant: r() < .5 ? -1 : 1, z: (r() - .5) * 2 }
     params.raamRitme = null
     params.sparingen = []
   }

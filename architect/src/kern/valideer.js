@@ -411,8 +411,10 @@ export function valideerModel(model, opties = {}) {
   // en nooit over een contactzone
   for (const rand of model.randafwerking.filter(r => r.type === 'pergola')) {
     const vol = model.volumes.find(v => v.id === rand.volumeId)
-    if (rand.h < 2.2 || rand.h > vol.goot - .05)
+    if (rand.h - (rand.basis || 0) < 2.2 || rand.h > vol.goot - .05)
       fouten.push(vol.id + ': pergola op onlogische hoogte (h=' + rand.h.toFixed(2) + ')')
+    if (rand.basis && !model.volumes.some(v => v.terras && Math.abs(v.goot + v.dakDikte - rand.basis) < .05))
+      fouten.push(vol.id + ': pergola op een dak zonder begaanbaar terras')
     if (rand.z0 < -vol.d / 2 - .01 || rand.z1 > vol.d / 2 + .01)
       fouten.push(vol.id + ': pergola steekt buiten de gevel')
     const w = model.wanden.find(x => x.id === vol.id + ':langs' + (rand.kant === 1 ? '+' : '-'))
