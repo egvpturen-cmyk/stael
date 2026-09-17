@@ -5,7 +5,7 @@
 
 import { dakOnderY, nokProfiel, wandVol, WAND_DIKTE, dakVlak3D, snijlijn, lijnOpY, rectVan, terrasSegmenten, wandLokaalU } from './model.js'
 import { STAELDETAILS } from './staeldetails.js'
-import { leidGeometrieAf, dektPunt, wandTransform, inPolyMetGroei } from './afleiding.js'
+import { leidGeometrieAf, dektPunt, wandTransform, inPolyMetGroei, primBol } from './afleiding.js'
 
 const sparingPunten = s => s.poly || [
   [s.rect.u - s.rect.w / 2, s.rect.v], [s.rect.u + s.rect.w / 2, s.rect.v],
@@ -49,9 +49,23 @@ export function schilFouten(model, opties = {}) {
     }
     const dikV = Math.max(dikVOp(-vol.b / 2), dikVOp(vol.b / 2))
 
-    // A. fysieke dichtheid door de schildikte
+    // A. fysieke dichtheid door de schildikte; per wand doet alleen
+    // het handjevol primitieven mee waarvan de omhullende bol het
+    // wandvenster uberhaupt kan raken (conservatief: straal telt mee,
+    // dus dit verandert geen enkele uitkomst, alleen de rekentijd)
     const dieptes = []
     for (let dz = -.05; dz <= WAND_DIKTE + .35; dz += .045) dieptes.push(dz)
+    const topMax = Math.max(vol.nok || 0, vol.goot) + .1
+    const cT = Math.cos(t.ry), sT = Math.sin(t.ry)
+    const kandidaten = prims.filter(p => {
+      const bol = primBol(p)
+      const dx = bol.c[0] - t.pos[0], dzw = bol.c[2] - t.pos[2]
+      const lu = cT * dx - sT * dzw
+      const ld = sT * dx + cT * dzw
+      return lu > -grensU - bol.r - .1 && lu < grensU + bol.r + .1
+        && bol.c[1] > (vol.basis || 0) - bol.r && bol.c[1] < topMax + bol.r
+        && ld > -.15 - bol.r && ld < WAND_DIKTE + .45 + bol.r
+    })
     let gaten = 0, eerste = null
     for (let u = -grensU; u <= grensU; u += stap) {
       const vTop = (wand.type === 'kop' ? dakOnderY(u, vol) : vol.goot) - .04
@@ -59,7 +73,7 @@ export function schilFouten(model, opties = {}) {
         if (inMasker(wand, u, v)) continue
         if (!dieptes.some(dz => {
           const P = wereld(t, u, v, dz)
-          return prims.some(p => dektPunt(p, P))
+          return kandidaten.some(p => dektPunt(p, P))
         })) {
           gaten++
           if (!eerste) eerste = [u, v]

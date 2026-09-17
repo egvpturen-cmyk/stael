@@ -442,14 +442,19 @@ export function bouwModel(p) {
         posities.push([hx - Math.sign(hx - cx || 1) * .15, hz - Math.sign(hz - cz || 1) * .15])
     }
     if (posities.length) model.randafwerking.push({ type: 'stapelkolommen', volumeId: 'boven', posities, h: basis })
-    // dakopbouw op de bovendoos, met zijn deur als terrastoegang
-    if (m.opbouw) {
+    // dakopbouw op de bovendoos, met zijn deur als terrastoegang; hij
+    // schuift naar achteren zodat voor de deur altijd een begaanbaar
+    // terras van ruim 1,2 m overblijft; op een te kleine bovendoos komt
+    // geen opbouw (dan is er geen terras om te ontsluiten)
+    const opbouwKan = m.opbouw && b2 >= 3 && d2 >= 3.8
+    if (opbouwKan) {
       const basis2 = basis + h2 + boven.vol.dakDikte
       const b3 = klem(m.opbouw.b ?? 2.5, 1.8, b2 - .9)
-      const d3 = klem(m.opbouw.d ?? 2.2, 1.6, d2 - .9)
+      const d3 = klem(m.opbouw.d ?? 2.2, 1.6, d2 - 2.2)
       const h3 = klem(m.opbouw.h ?? 2.6, 2.4, 3)
+      const oz = cz - (d2 - d3) / 2 + .45
       const op = maakVolume('opbouw', 'opbouw', {
-        b: b3, d: d3, goot: basis2 + h3, plat: true, basis: basis2, pos: [cx, cz],
+        b: b3, d: d3, goot: basis2 + h3, plat: true, basis: basis2, pos: [cx, oz],
       }, null)
       voeg(op)
       const dOp = wand('opbouw:kop+')
@@ -500,7 +505,7 @@ export function bouwModel(p) {
         }
       }
     }
-    if (m.opbouw) maakTerras(boven.vol)
+    if (opbouwKan) maakTerras(boven.vol)
     // glasbanden per laag, geknipt rond deuren en elementen; ze worden
     // pas gelegd als alle sparingen en gevel-elementen bekend zijn
     naSparingen.push(() => {

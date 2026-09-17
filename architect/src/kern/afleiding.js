@@ -441,7 +441,9 @@ export function leidGeometrieAf(model, opties = {}) {
         case 'nokvouw': case 'kilkeper':
           pr.mat = lijnen; break
         case 'element': case 'bekleding':
-          pr.mat = { ...M.accent, hex: pr.kleur }; break
+          // de elementkleur uit het model blijft leidend, tenzij de
+          // accentkeuze in de UI hem bewust overschrijft
+          pr.mat = M.accent && M.accent.forceer ? M.accent : { ...M.accent, hex: pr.kleur }; break
         case 'portaal':
           pr.mat = { mat: 'verfAccent', hex: pr.kleur }; break
         case 'terras':

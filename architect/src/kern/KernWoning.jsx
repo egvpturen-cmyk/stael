@@ -197,28 +197,52 @@ function Prim({ prim }) {
   )
 }
 
-export function KernGebouw({ model }) {
+export function KernGebouw({ model, kavel }) {
   const prims = useMemo(() => leidGeometrieAf(model), [model])
-  const vol = model.volumes[0]
-  const straal = Math.max(...model.volumes.map(v => Math.max(v.b, v.d))) * 1.6 + 6
-  const gras = useMemo(() => {
-    const m = bibMat({ mat: 'gras', kleur: 'gras' }, 'terrein')
-    return m || basisMat('#3a4630', 'terrein')
-  }, [])
+  const voet = model.volumes.reduce((s, v) => s + v.b * v.d, 0)
+  // rustige kavelcontext: gras op de kavelmaat, lage erfgrenshaag,
+  // bestraat pad naar de entree, veldgroen tot de horizon
+  const kavelOpp = kavel || Math.max(500, voet * 3.2)
+  const kb = Math.sqrt(kavelOpp * 1.35)
+  const kd = kavelOpp / kb
+  const maxZ = Math.max(...model.volumes.map(v => (v.pos ? v.pos[1] : 0) + v.d / 2))
+  const padLen = Math.max(1.5, kd / 2 - maxZ - .3)
+  const gras = bibMat({ mat: 'gras', kleur: 'gras' }, 'terrein') || basisMat('#5a6349', 'terrein')
+  const straat = bibMat({ mat: 'bestrating', kleur: 'grijs' }, 'terrein') || basisMat('#8b8b86', 'terrein')
+  const veld = basisMat('#66705a', 'terrein')
+  const haag = basisMat('#3d4a36', 'haag')
   return (
     <group>
       {prims.map((p, i) => <Prim key={i} prim={p} />)}
-      <mesh material={gras} rotation={[-Math.PI / 2, 0, 0]} position={[0, -.01, 0]} receiveShadow>
-        <circleGeometry args={[straal, 56]} />
+      <mesh material={gras} rotation={[-Math.PI / 2, 0, 0]} position={[0, -.005, 0]} receiveShadow>
+        <planeGeometry args={[kb, kd]} />
       </mesh>
+      <mesh material={veld} rotation={[-Math.PI / 2, 0, 0]} position={[0, -.04, 0]} receiveShadow>
+        <circleGeometry args={[240, 48]} />
+      </mesh>
+      {padLen > 1 && (
+        <mesh material={straat} position={[0, .012, maxZ + .2 + padLen / 2]} receiveShadow>
+          <boxGeometry args={[1.7, .025, padLen]} />
+        </mesh>
+      )}
+      {[[0, -kd / 2], [0, kd / 2]].map(([x, z], i) => (
+        <mesh key={'h' + i} material={haag} position={[x, .22, z]} castShadow receiveShadow>
+          <boxGeometry args={[kb + .25, .45, .3]} />
+        </mesh>
+      ))}
+      {[[-kb / 2, 0], [kb / 2, 0]].map(([x, z], i) => (
+        <mesh key={'v' + i} material={haag} position={[x, .22, z]} castShadow receiveShadow>
+          <boxGeometry args={[.3, .45, kd + .25]} />
+        </mesh>
+      ))}
     </group>
   )
 }
 
-export default function KernCanvas({ model, camera }) {
+export default function KernCanvas({ model, camera, kavel }) {
   const maat = Math.max(...model.volumes.map(v => Math.max(v.b, v.d))) + 8
   return (
-    <Canvas shadows dpr={[1, 1.75]} camera={{ position: camera.pos, fov: camera.fov ?? 40 }}
+    <Canvas shadows frameloop="demand" dpr={[1, 1.75]} camera={{ position: camera.pos, fov: camera.fov ?? 40 }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
       onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = .85 }}>
       <Environment files="./omgeving/lucht.hdr" background backgroundBlurriness={.04} />
@@ -228,7 +252,7 @@ export default function KernCanvas({ model, camera }) {
         shadow-camera-left={-maat} shadow-camera-right={maat}
         shadow-camera-top={maat} shadow-camera-bottom={-maat}
         shadow-camera-near={1} shadow-camera-far={60} />
-      <KernGebouw model={model} />
+      <KernGebouw model={model} kavel={kavel} />
       <OrbitControls target={camera.doel} enablePan={false} maxPolarAngle={Math.PI * .52} />
     </Canvas>
   )
