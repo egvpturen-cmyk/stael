@@ -250,6 +250,7 @@ export function bouwSpec(p) {
     gevel2: p.gevel2 ? kleur(p.gevel2) : null,
     massa: p.massa || 'enkel',
     nokOffset: p.nokOffset || 0,
+    dakDikte: p.dakDikte,
     kop: {
       stramien: p.stramien || 'stroken',
       kader: !!p.kader, kaderKleur: p.kader && p.kader.kleur ? kleur(p.kader.kleur) : null,

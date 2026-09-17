@@ -84,7 +84,11 @@ main{padding:1.4rem;overflow-y:auto}
 .kalkop h2{font-size:.95rem;font-weight:640;letter-spacing:.03em}
 .kalstatus{font-size:.65rem;letter-spacing:.16em;text-transform:uppercase;padding:.2rem .6rem;border:1px solid var(--rand);color:var(--grijs)}
 .kalstatus.geslaagd{border-color:#5a8a5e;color:#8fc493}
-.kalstatus.bezig{border-color:var(--koper);color:var(--koper-fel)}
+.kalstatus.bijna{border-color:var(--koper);color:var(--koper-fel)}
+.kalknoppen{margin-left:auto;display:flex;gap:.35rem}
+.kalknoppen button{background:var(--paneel2);border:1px solid var(--rand);color:var(--grijs);
+  padding:.3rem .7rem;font-family:inherit;font-size:.7rem;letter-spacing:.08em;cursor:pointer}
+.kalknoppen button.actief{border-color:var(--koper);color:var(--koper-fel)}
 .kalpaar{display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:stretch}
 .kalpaar figure{margin:0;background:#0e0e10;display:flex;align-items:center;justify-content:center}
 .kalpaar img{max-width:100%;max-height:420px;object-fit:contain;display:block}

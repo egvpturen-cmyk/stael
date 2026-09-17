@@ -1,13 +1,30 @@
+import { useEffect, useState } from 'react'
 import { KALIBRATIE } from './kalibratie.js'
 import { bouwSpec } from './generator.js'
 import Woning3D from './Woning3D.jsx'
 
 // Interne kalibratiepagina (/kalibratie, niet gelinkt in de klant-UI).
-// Links het referentiebeeld, rechts de 3D-nabouw van de generator vanuit
-// ongeveer dezelfde camerahoek. Nabouwsels zijn testmateriaal en
-// verschijnen nooit als klantvariant.
+// Links het referentiebeeld, rechts de 3D-nabouw vanuit dezelfde
+// camerahoek. De status geslaagd wordt uitsluitend door STAEL zelf
+// gegeven, via de knoppen per rij (lokaal opgeslagen in de browser).
+
+const OPSLAG = 'stael-kalibratie-status'
+const STATUSSEN = ['review', 'bijna', 'geslaagd']
+const LABELS = { review: 'in review', bijna: 'bijna', geslaagd: 'geslaagd' }
+
+function leesStatussen() {
+  try { return JSON.parse(localStorage.getItem(OPSLAG)) || {} } catch { return {} }
+}
+
 export default function Kalibratie() {
-  const geslaagd = KALIBRATIE.filter(p => p.status === 'geslaagd').length
+  const [statussen, zetStatussen] = useState(leesStatussen)
+  useEffect(() => {
+    try { localStorage.setItem(OPSLAG, JSON.stringify(statussen)) } catch { /* prive-modus */ }
+  }, [statussen])
+
+  const statusVan = nr => statussen[nr] || 'review'
+  const geslaagd = KALIBRATIE.filter(p => statusVan(p.nr) === 'geslaagd').length
+
   return (
     <div className="kalibratie">
       <header>
@@ -17,12 +34,22 @@ export default function Kalibratie() {
       </header>
       {KALIBRATIE.map(p => {
         const spec = bouwSpec(p.params)
-        const programma = { kavel: Math.max(600, spec.voet * 4), bouwvlak: spec.voet * 1.3 }
+        const programma = { kavel: spec.voet * 2, bouwvlak: spec.voet * 1.15 }
+        const status = statusVan(p.nr)
         return (
-          <section key={p.nr} className={'kalrij status-' + p.status} id={'ref-' + p.nr}>
+          <section key={p.nr} className={'kalrij status-' + status} id={'ref-' + p.nr}>
             <div className="kalkop">
               <h2>Referentie {p.nr} · {p.naam}</h2>
-              <span className={'kalstatus ' + p.status}>{p.status}</span>
+              <span className={'kalstatus ' + status}>{LABELS[status]}</span>
+              <div className="kalknoppen">
+                {STATUSSEN.map(s => (
+                  <button key={s} type="button"
+                    className={s === status ? 'actief' : ''}
+                    onClick={() => zetStatussen(v => ({ ...v, [p.nr]: s }))}>
+                    {LABELS[s]}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="kalpaar">
               <figure><img src={'./referenties/' + p.beeld} alt={'Referentie ' + p.nr} /></figure>

@@ -42,7 +42,7 @@ function Volume({ b, d, goot, nok, nokOffset = 0, kleur, plat }) {
 // dakplaten die de (eventueel asymmetrische) kap volgen; veranda trekt
 // het dakvlak aan de kopzijde door op stalen kolommen
 // veranda: 0 of {diepte, kolommen} (aantal kolommen per gootzijde)
-function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, veranda = 0, zijLuifel = null }) {
+function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, veranda = 0, zijLuifel = null, dikte = .14 }) {
   const vDiepte = veranda ? (veranda.diepte ?? veranda) : 0
   const vKolommen = veranda ? (veranda.kolommen ?? 2) : 2
   const mat = useMemo(() => dakMatVan(kleur), [kleur])
@@ -77,15 +77,15 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
         }
         return (
           <mesh key={i} material={mat}
-            position={[cx, cy + .12, zMid]}
+            position={[cx, cy + dikte * .85, zMid]}
             rotation={[0, 0, hoek]}>
-            <boxGeometry args={[len, .14, diepte]} />
+            <boxGeometry args={[len, dikte, diepte]} />
           </mesh>
         )
       })}
       {/* nokkap en gootranden: aansluitingen zichtbaar dicht */}
-      <mesh material={mat} position={[nokOffset, nok + .18, zMid]}>
-        <boxGeometry args={[.34, .12, diepte]} />
+      <mesh material={mat} position={[nokOffset, nok + dikte * 1.15, zMid]}>
+        <boxGeometry args={[.34 + dikte, .12, diepte]} />
       </mesh>
       {[-1, 1].map(k => (
         <mesh key={'goot' + k} material={mat} position={[k * (b / 2 + overstek * .55), goot + .04, zMid]}>
@@ -111,7 +111,7 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
             : d / 2 + .3 + (vDiepte - .8) * (i / (vKolommen - 1))
           return (
             <mesh key={kant + ':' + i} material={MAT.staal} position={[kant * (b / 2 - .25), goot / 2, z]}>
-              <cylinderGeometry args={[.06, .06, goot, 10]} />
+              <cylinderGeometry args={[.09, .09, goot, 10]} />
             </mesh>
           )
         }))}
@@ -126,7 +126,7 @@ function Dakplaten({ b, d, goot, nok, nokOffset = 0, overstek, kleur, plat, vera
 
 // glazen kopgevel die de daklijn volgt, met stramienstijl, kader,
 // lamellen en balkon als opties
-function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', kader, kaderKleur, lamellen, balkon, puiFactor = 0, puiX = 0, penanten = null, ry = 0, xc = 0 }) {
+function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', kader, kaderKleur, lamellen, balkon, balkonY = 0, puiFactor = 0, puiX = 0, penanten = null, ry = 0, xc = 0 }) {
   const gB = b * (puiFactor || (stramien === 'vlak' ? .7 : .62))
   const marge = .3
   // x is lokaal binnen de pui; de echte gevelpositie is x + puiX
@@ -154,8 +154,8 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
       let h = randYOp(x + puiX, b, goot, nok, nokOffset, marge + .05)
       if (penanten.hMax) h = Math.min(h, penanten.hMax)
       delen.push(
-        <mesh key={'p' + i} material={pMat} position={[x, h / 2 + .05, .06]}>
-          <boxGeometry args={[penanten.breedte || .5, h, .1]} />
+        <mesh key={'p' + i} material={pMat} position={[x, h / 2 + .05, .1]}>
+          <boxGeometry args={[penanten.breedte || .4, h, .26]} />
         </mesh>
       )
     }
@@ -243,13 +243,19 @@ function KopGevel({ b, goot, nok, nokOffset = 0, plat, z, stramien = 'stroken', 
     delen.push(<group key="lamellen">{lams}</group>)
   }
   if (balkon) {
+    const bY = balkonY || 2.95
     delen.push(
-      <group key="balkon" position={[0, 2.95, .55]}>
-        <mesh material={MAT.staal}><boxGeometry args={[2.6, .12, 1.2]} /></mesh>
-        <mesh material={MAT.kozijn} position={[0, .55, .56]}><boxGeometry args={[2.6, .05, .05]} /></mesh>
-        {Array.from({ length: 13 }, (_, i) => (
-          <mesh key={i} material={MAT.kozijn} position={[-1.25 + i * .208, .28, .56]}>
-            <boxGeometry args={[.03, .55, .03]} />
+      <group key="balkon" position={[0, bY, .72]}>
+        <mesh material={MAT.staal}><boxGeometry args={[3.0, .12, 1.5]} /></mesh>
+        <mesh material={MAT.kozijn} position={[0, .6, .72]}><boxGeometry args={[3.0, .05, .05]} /></mesh>
+        {Array.from({ length: 16 }, (_, i) => (
+          <mesh key={i} material={MAT.kozijn} position={[-1.45 + i * .193, .3, .72]}>
+            <boxGeometry args={[.03, .6, .03]} />
+          </mesh>
+        ))}
+        {[-1, 1].map(k => (
+          <mesh key={'zij' + k} material={MAT.kozijn} position={[k * 1.48, .3, .05]} rotation={[0, Math.PI / 2, 0]}>
+            <boxGeometry args={[1.4, .05, .05]} />
           </mesh>
         ))}
       </group>
@@ -386,7 +392,7 @@ function Portaal({ spec }) {
       </mesh>
     )
   }
-  const top = [[-b / 2 + dik / 2, off], [off, b / 2 - dik / 2]]
+  const top = spec.portaal.wangen ? [] : [[-b / 2 + dik / 2, off], [off, b / 2 - dik / 2]]
   top.forEach(([x1, x2], i) => {
     const y1 = randYOp(x1, b, goot, nok, off, -.06)
     const y2 = randYOp(x2, b, goot, nok, off, -.06)
@@ -470,12 +476,14 @@ function MassaEnkel({ spec }) {
     <group>
       <Volume b={b} d={d} goot={goot} nok={nok} nokOffset={off} kleur={spec.gevel} plat={plat} />
       <Dakplaten b={b} d={d} goot={goot} nok={nok} nokOffset={off} overstek={spec.overstek}
-        kleur={spec.dak} plat={plat} veranda={verandaVan(spec)} zijLuifel={spec.zijLuifel} />
+        kleur={spec.dak} plat={plat} veranda={verandaVan(spec)} zijLuifel={spec.zijLuifel}
+        dikte={spec.dakDikte || .14} />
       <KopGevel b={b} goot={goot} nok={nok} nokOffset={off} plat={plat} z={d / 2 + .04}
         stramien={spec.kop.stramien} kader={spec.kop.kader} kaderKleur={spec.kop.kaderKleur}
         lamellen={spec.kop.lamellen} puiFactor={spec.kop.puiFactor} puiX={spec.kop.puiX || 0}
         penanten={spec.kop.penanten}
-        balkon={spec.elementen.includes('balkon')} />
+        balkon={spec.elementen.includes('balkon')}
+        balkonY={spec.plint ? spec.plint.h + .08 : 0} />
       <LangsGevels spec={spec} b={b} d={d} goot={goot} />
       {spec.typologie.id === 'paviljoen' && [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([kx, kz]) => (
         <mesh key={kx + ':' + kz} material={MAT.staal}
@@ -501,7 +509,7 @@ function MassaKopstaart({ spec }) {
       <group position={[0, 0, (d - ks.dKop) / 2]}>
         <Volume b={b} d={ks.dKop} goot={ks.gootK} nok={ks.nokK} kleur={spec.gevel} />
         <Dakplaten b={b} d={ks.dKop} goot={ks.gootK} nok={ks.nokK} overstek={spec.overstek} kleur={spec.dak}
-          veranda={verandaVan(spec)} />
+          veranda={verandaVan(spec)} dikte={spec.dakDikte || .14} />
         <KopGevel b={b} goot={ks.gootK} nok={ks.nokK} z={ks.dKop / 2 + .04}
           stramien={spec.kop.stramien} kader={spec.kop.kader} kaderKleur={spec.kop.kaderKleur}
           lamellen={spec.kop.lamellen} puiFactor={spec.kop.puiFactor}
@@ -649,7 +657,7 @@ function MassaStapel({ spec }) {
       )}
       {(st.kolommen || []).map((k, i) => (
         <mesh key={i} material={MAT.staal} position={[k.x, (k.h ?? o.h) / 2, k.z]}>
-          <cylinderGeometry args={[.07, .07, k.h ?? o.h, 10]} />
+          <cylinderGeometry args={[k.r ?? .12, k.r ?? .12, k.h ?? o.h, 12]} />
         </mesh>
       ))}
     </group>
