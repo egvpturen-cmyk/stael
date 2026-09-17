@@ -559,6 +559,160 @@ function MassaZwevend({ spec }) {
   )
 }
 
+// glasband met slanke stijlen rond een doosvolume
+function GlasBand({ b, d, x = 0, z = 0, y0, y1 }) {
+  const h = y1 - y0
+  return (
+    <group position={[x, (y0 + y1) / 2, z]}>
+      {[[0, d / 2 + .03, 0], [0, -d / 2 - .03, Math.PI], [b / 2 + .03, 0, Math.PI / 2], [-b / 2 - .03, 0, -Math.PI / 2]].map(([px, pz, ry], i) => {
+        const breed = (i < 2 ? b : d) - .25
+        const nS = Math.max(3, Math.round(breed / 1.1))
+        return (
+          <group key={i} position={[px, 0, pz]} rotation={[0, ry, 0]}>
+            <mesh material={MAT.glas}><planeGeometry args={[breed, h]} /></mesh>
+            {Array.from({ length: nS + 1 }, (_, j) => (
+              <mesh key={j} material={MAT.kozijn} position={[-breed / 2 + (breed / nS) * j, 0, .02]}>
+                <boxGeometry args={[STAEL.kozijnDikte, h, STAEL.kozijnDikte]} />
+              </mesh>
+            ))}
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+// gestapelde dozen met vrije offsets: onderbouw (open of dicht),
+// bovenvolume met uitkraging, kolommen op maat
+function MassaStapel({ spec }) {
+  const st = spec.stapel
+  const o = st.onder, bo = st.boven
+  return (
+    <group>
+      {o.open ? (
+        <mesh material={stdMat(o.kern?.kleur || o.kleur || spec.gevel)}
+          position={[o.kern?.x || 0, o.h / 2, o.kern?.z || 0]}>
+          <boxGeometry args={[o.kern?.b || 2.4, o.h, o.kern?.d || 3.2]} />
+        </mesh>
+      ) : (
+        <mesh material={stdMat(o.kleur || spec.gevel)} position={[o.x || 0, o.h / 2, o.z || 0]}>
+          <boxGeometry args={[o.b, o.h, o.d]} />
+        </mesh>
+      )}
+      <mesh material={stdMat(bo.kleur || spec.gevel)} position={[bo.x || 0, o.h + bo.h / 2, bo.z || 0]}>
+        <boxGeometry args={[bo.b, bo.h, bo.d]} />
+      </mesh>
+      <mesh material={MAT.staal} position={[bo.x || 0, o.h + bo.h + .1, bo.z || 0]}>
+        <boxGeometry args={[bo.b + .4, .2, bo.d + .4]} />
+      </mesh>
+      {st.glasband && (
+        <GlasBand b={bo.b} d={bo.d} x={bo.x || 0} z={bo.z || 0}
+          y0={st.glasband.y0 ?? o.h + .3} y1={st.glasband.y1 ?? o.h + bo.h - .5} />
+      )}
+      {st.glasbandOnder && !o.open && (
+        <GlasBand b={o.b} d={o.d} x={o.x || 0} z={o.z || 0}
+          y0={st.glasbandOnder.y0 ?? .3} y1={st.glasbandOnder.y1 ?? o.h - .3} />
+      )}
+      {(st.kolommen || []).map((k, i) => (
+        <mesh key={i} material={MAT.staal} position={[k.x, (k.h ?? o.h) / 2, k.z]}>
+          <cylinderGeometry args={[.07, .07, k.h ?? o.h, 10]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// glazen puien en grote ramen met kozijnkader, vrij te plaatsen
+function GlasPanelen({ spec }) {
+  if (!spec.glasPanelen) return null
+  return spec.glasPanelen.map((p, i) => {
+    const dik = p.kader ?? .08
+    const binnen = []
+    binnen.push(<mesh key="glas" material={MAT.glas}><planeGeometry args={[p.w, p.h]} /></mesh>)
+    if (dik >= .15) {
+      // dik, uitstekend kader rond het raam (vier randen)
+      const uit = .3
+      binnen.push(
+        <group key="kader">
+          <mesh material={MAT.kozijn} position={[0, p.h / 2 + dik / 2, uit / 2 - .02]}><boxGeometry args={[p.w + dik * 2, dik, uit]} /></mesh>
+          <mesh material={MAT.kozijn} position={[0, -p.h / 2 - dik / 2, uit / 2 - .02]}><boxGeometry args={[p.w + dik * 2, dik, uit]} /></mesh>
+          <mesh material={MAT.kozijn} position={[-p.w / 2 - dik / 2, 0, uit / 2 - .02]}><boxGeometry args={[dik, p.h, uit]} /></mesh>
+          <mesh material={MAT.kozijn} position={[p.w / 2 + dik / 2, 0, uit / 2 - .02]}><boxGeometry args={[dik, p.h, uit]} /></mesh>
+        </group>
+      )
+    } else {
+      binnen.push(
+        <mesh key="vlak" material={MAT.kozijn} position={[0, 0, -.02]}>
+          <boxGeometry args={[p.w + dik * 2, p.h + dik * 2, .05]} />
+        </mesh>
+      )
+    }
+    if (p.stijlen) {
+      for (let j = 1; j < p.stijlen; j++) {
+        binnen.push(
+          <mesh key={'st' + j} material={MAT.kozijn} position={[-p.w / 2 + (p.w / p.stijlen) * j, 0, .02]}>
+            <boxGeometry args={[STAEL.kozijnDikte, p.h, STAEL.kozijnDikte]} />
+          </mesh>
+        )
+      }
+    }
+    if (p.vlak === 'kop') {
+      const z = p.z ?? spec.d / 2 + .06
+      return <group key={i} position={[p.x || 0, p.y, z]}>{binnen}</group>
+    }
+    const kant = p.vlak === 'rechts' ? 1 : -1
+    const x = p.x ?? kant * (spec.b / 2 + .06)
+    return (
+      <group key={i} position={[x, p.y, p.z || 0]} rotation={[0, kant * Math.PI / 2, 0]}>
+        {binnen}
+      </group>
+    )
+  })
+}
+
+// pergola: liggend lamellendak, uitkragend of vrijstaand
+function Pergola({ spec }) {
+  if (!spec.pergola) return null
+  const p = spec.pergola
+  const lats = []
+  const n = Math.max(3, Math.round(p.d / (p.stap || .5)))
+  for (let i = 0; i <= n; i++) {
+    lats.push(
+      <mesh key={i} material={MAT.staal} position={[p.x || 0, p.y, (p.z || 0) - p.d / 2 + (p.d / n) * i]}>
+        <boxGeometry args={[p.b, .09, .18]} />
+      </mesh>
+    )
+  }
+  return (
+    <group>
+      {lats}
+      {[-1, 1].map(k => (
+        <mesh key={k} material={MAT.staal} position={[(p.x || 0) + k * (p.b / 2 - .1), p.y, p.z || 0]}>
+          <boxGeometry args={[.16, .22, p.d]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// balustrade met spijlen (dakterras of frans balkon op maat)
+function Balustrades({ spec }) {
+  if (!spec.balustrades) return null
+  return spec.balustrades.map((ba, i) => {
+    const n = Math.max(6, Math.round(ba.w / .16))
+    return (
+      <group key={i} position={[ba.x || 0, ba.y, ba.z || 0]} rotation={[0, ba.ry || 0, 0]}>
+        <mesh material={MAT.kozijn} position={[0, .5, 0]}><boxGeometry args={[ba.w, .05, .05]} /></mesh>
+        {Array.from({ length: n + 1 }, (_, j) => (
+          <mesh key={j} material={MAT.kozijn} position={[-ba.w / 2 + (ba.w / n) * j, .25, 0]}>
+            <boxGeometry args={[.03, .5, .03]} />
+          </mesh>
+        ))}
+      </group>
+    )
+  })
+}
+
 // ---------- creatieve elementen ----------
 
 function Elementen({ spec }) {
@@ -718,6 +872,7 @@ const MASSA_COMP = {
   dwarskap: MassaDwarskap,
   asym: MassaEnkel,      // asymmetrie zit in nokOffset
   zwevend: MassaZwevend,
+  stapel: MassaStapel,
 }
 
 export function Woning({ spec, programma }) {
@@ -732,6 +887,9 @@ export function Woning({ spec, programma }) {
       <LamellenVelden spec={spec} />
       <DakOpbouw spec={spec} />
       <AanbouwVolumes spec={spec} />
+      <GlasPanelen spec={spec} />
+      <Pergola spec={spec} />
+      <Balustrades spec={spec} />
       <Kavel spec={spec} programma={programma} />
     </group>
   )

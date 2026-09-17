@@ -83,6 +83,10 @@ export const MASSAS = {
     naam: 'zwevend volume', zin: 'een uitkragende glazen doos op slanke stalen kolommen',
     kan: s => s.lagen === 2,
   },
+  stapel: {
+    naam: 'gestapelde volumes', zin: 'twee gestapelde dozen met een verspringende uitkraging',
+    kan: s => s.lagen === 2,
+  },
 }
 
 // Stramienstijlen voor de glazen kopgevel
