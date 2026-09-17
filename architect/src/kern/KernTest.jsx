@@ -1,7 +1,21 @@
+import { useEffect, useRef, useState } from 'react'
 import { bouwModel } from './model.js'
 import { valideerModel, repareerModel } from './valideer.js'
 import KernCanvas from './KernWoning.jsx'
 import IfcPaneel from './IfcPaneel.jsx'
+
+// mount een canvas alleen wanneer het (bijna) in beeld is: de pagina
+// heeft meer zichten dan de browser gelijktijdige WebGL-contexts toestaat
+function LuiCanvas({ children }) {
+  const ref = useRef(null)
+  const [zichtbaar, zetZichtbaar] = useState(false)
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => zetZichtbaar(e.isIntersecting), { rootMargin: '250px' })
+    io.observe(ref.current)
+    return () => io.disconnect()
+  }, [])
+  return <div ref={ref} style={{ position: 'absolute', inset: 0 }}>{zichtbaar ? children : null}</div>
+}
 
 // Interne testpagina voor de gebouwmodel-kern (?kern): de schuurwoning
 // van stap 1 in beide detailfamilies (strak/gootloos en kolossaal
@@ -36,7 +50,7 @@ function Blok({ titel, model, fouten, zichten }) {
         {zichten.map(z => (
           <div key={z.naam} className="kernvak" id={'zicht-' + titel.split(' ')[0].toLowerCase() + '-' + z.naam.replace(/\s+/g, '-')}>
             <h2>{z.naam}</h2>
-            <div className="kerncanvas"><KernCanvas model={model} camera={z.camera} /></div>
+            <div className="kerncanvas"><LuiCanvas><KernCanvas model={model} camera={z.camera} /></LuiCanvas></div>
           </div>
         ))}
       </div>
@@ -54,6 +68,9 @@ export default function KernTest() {
     { naam: 'nok voor', camera: { pos: [2.5, vol.nok + 1.2, vol.d / 2 + 3.5], doel: [0, vol.nok - .3, vol.d / 2 - 1], fov: 35 } },
     { naam: 'nok zij', camera: { pos: [10, vol.nok + 3.5, 0], doel: [0, vol.nok - .6, 0], fov: 35 } },
     { naam: 'nok schuin achter', camera: { pos: [-4.5, vol.nok + 2.6, -vol.d / 2 - 4.5], doel: [0, vol.nok - .5, -vol.d / 2 + 2], fov: 35 } },
+    { naam: 'geveltop frontaal', camera: { pos: [0, vol.nok - .2, vol.d / 2 + 7.5], doel: [0, vol.nok - .8, vol.d / 2], fov: 35 } },
+    { naam: 'keuring laag links', camera: { pos: [-6.5, 1.1, 9.5], doel: [0, 4.2, 2], fov: 42 } },
+    { naam: 'keuring hoog achter', camera: { pos: [4.5, 9.5, -8.5], doel: [-2, 2.2, 2], fov: 42 } },
     { naam: 'dakrand', camera: { pos: [vol.b / 2 + 3, vol.goot + 1.8, vol.d / 2 - 1], doel: [vol.b / 2 - .2, vol.goot + .1, vol.d / 2 - 3.5], fov: 35 } },
     { naam: 'gevelhoek', camera: { pos: [vol.b / 2 + 2.6, 1.8, vol.d / 2 + 2.6], doel: [vol.b / 2 - .3, 1.3, vol.d / 2 - .3], fov: 35 } },
   ]
@@ -61,6 +78,7 @@ export default function KernTest() {
     { naam: 'totaal', camera: { pos: [13, 6, 15], doel: [0, 2.6, 0] } },
     { naam: 'dakrand onderzijde', camera: { pos: [vol.b / 2 + 5, .8, vol.d / 2 - 1], doel: [vol.b / 2 + .6, vol.goot - 1.0, vol.d / 2 - 4], fov: 40 } },
     { naam: 'nok', camera: { pos: [2.5, vol.nok + 1.2, vol.d / 2 + 3.5], doel: [0, vol.nok - .3, vol.d / 2 - 1], fov: 35 } },
+    { naam: 'keuring schuin onder', camera: { pos: [7.5, .7, 8.5], doel: [1, 3.4, 0], fov: 42 } },
   ]
   // stap 2: gevel-elementen met de kopgevel als gastvlak
   const stap2 = maak({
@@ -106,7 +124,7 @@ export default function KernTest() {
           {ifcZichten.map(z => (
             <div key={z.naam} className="kernvak" id={'zicht-ifc-' + z.naam}>
               <h2>{z.naam}</h2>
-              <div className="kerncanvas"><IfcPaneel camera={z.camera} /></div>
+              <div className="kerncanvas"><LuiCanvas><IfcPaneel camera={z.camera} /></LuiCanvas></div>
             </div>
           ))}
         </div>
