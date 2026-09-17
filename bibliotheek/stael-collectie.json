@@ -1,0 +1,274 @@
+[
+ {
+  "nummer": 1,
+  "naam": "SPANT",
+  "familie": "A",
+  "bestand": "img-000.jpg",
+  "materialen": "Zwart felsdak · thermisch gemodificeerd hout · aluminium kozijnen · glas",
+  "beschrijving": "Een archetypische kap, teruggebracht tot zijn essentie. Het zwarte felswerk vouwt van dak naar gevel zonder onderbreking, terwijl de houten flanken warmte geven aan het strakke silhouet. De lage luifel verankert de woning aan het maaiveld en maakt de entree vanzelfsprekend."
+ },
+ {
+  "nummer": 2,
+  "naam": "GLOED",
+  "familie": "E",
+  "bestand": "img-013.jpg",
+  "materialen": "Bronskleurig aluminium · donker hout · natuursteen · grote glasvlakken",
+  "beschrijving": "Twee zwevende daklijsten in brons definiëren deze villa, laag boven laag. Daartussen niets dan glas en donker hout, waardoor de woning in de avond van binnenuit gaat gloeien. Een ontwerp voor wie horizontaal wonen als luxe beschouwt."
+ },
+ {
+  "nummer": 3,
+  "naam": "ERTS",
+  "familie": "D",
+  "bestand": "img-012.jpg",
+  "materialen": "Cortenstaal · zwart felsdak · lichte steen · stalen balkonpui",
+  "beschrijving": "Corten over de volle kopgevel én het dakvlak: het materiaal mag hier verweren tot een levend oppervlak dat elke dag anders kleurt. De lichte stenen plint houdt het geheel geaard. Ruig van buiten, verfijnd gedetailleerd waar de pui het balkon ontmoet."
+ },
+ {
+  "nummer": 4,
+  "naam": "VIDE",
+  "familie": "A",
+  "bestand": "img-002.jpg",
+  "materialen": "Zwart felswerk · verticale houten delen · dubbelhoge glaspui",
+  "beschrijving": "De volledige topgevel is opengewerkt tot één dubbelhoog glasvlak met een fijn stalen stramien. Binnen betekent dat een vide waar het polderlicht tot diep in de woning valt. De lagere zijvleugel houdt het programma gelijkvloers bereikbaar."
+ },
+ {
+  "nummer": 5,
+  "naam": "VLEUGEL",
+  "familie": "F",
+  "bestand": "img-011.jpg",
+  "materialen": "Zwart staal · doorlopend houten plafond · rondom glas",
+  "beschrijving": "Een vlinderdak dat als twee vleugels boven het glazen volume zweeft. Het houten plafond loopt ononderbroken van binnen naar buiten door, gedragen door slanke stalen kolommen. Paviljoenwonen in zijn puurste vorm: nergens een dragende wand in het zicht."
+ },
+ {
+  "nummer": 6,
+  "naam": "KOPER",
+  "familie": "B",
+  "bestand": "img-006.jpg",
+  "materialen": "Koperkleurig felsdak · lichte steen · naturel hout",
+  "beschrijving": "Het koperen dakvlak is hier de hoofdrolspeler en vangt elk uur van de dag ander licht. Daaronder een rustige compositie van lichte steen en hout, met een plat houten zijvolume dat de kap extra hoogte geeft. Chic zonder ooit luid te worden."
+ },
+ {
+  "nummer": 7,
+  "naam": "PORTIEK",
+  "familie": "A",
+  "bestand": "img-003.jpg",
+  "materialen": "Zwart felswerk · verticaal hout · betonsteen entreeportaal",
+  "beschrijving": "Een massief entreeportaal in lichte betonsteen schuift uit de zwarte hoofdvorm en maakt van thuiskomen een gebaar. De verticale houten delen zetten het ritme voor de hele gevel. Stoer volume, zachte materialen op ooghoogte."
+ },
+ {
+  "nummer": 8,
+  "naam": "PAVILJOEN",
+  "familie": "E",
+  "bestand": "img-019.jpg",
+  "materialen": "Naturel hout · bronskleurige daktrim · hoekpuien in glas",
+  "beschrijving": "Eén laag, L-vormig om het terras gevouwen, met glazen hoeken die de tuin het huis in halen. De dunne bronzen daktrim tekent een scherpe horizon tegen de lucht. Gelijkvloers wonen zonder ook maar iets van architectuur in te leveren."
+ },
+ {
+  "nummer": 9,
+  "naam": "OXIDE",
+  "familie": "D",
+  "bestand": "img-026.jpg",
+  "materialen": "Wit stucwerk · cortenstalen entreekader · zwart bijvolume",
+  "beschrijving": "Wit en corten zijn hier elkaars klankbord: het warmroestige entreekader snijdt diep in de strakke witte kap. Het zwarte platte bijvolume neemt het dagelijkse programma op zich. Een woning die van contrast haar handtekening maakt."
+ },
+ {
+  "nummer": 10,
+  "naam": "NEGGE",
+  "familie": "A",
+  "bestand": "img-008.jpg",
+  "materialen": "Verticaal hout · zwart felswerk · diepe entreenis",
+  "beschrijving": "De kracht zit in de diepte: de entree ligt als een houten nis ver terug in het zwarte volume, beschut en uitnodigend tegelijk. De houten topgevel loopt door tot in de nok. Wie hier binnenkomt, voelt de dikte van de schil."
+ },
+ {
+  "nummer": 11,
+  "naam": "OVERSTEK",
+  "familie": "F",
+  "bestand": "img-015.jpg",
+  "materialen": "Zwart staal · warm hout · glazen onderbouw",
+  "beschrijving": "De bovenverdieping kraagt als een donkere doos ver over het terras uit, gedragen door een constructie die je niet ziet maar wel voelt. Daaronder is de begane grond vrijwel volledig glas. Staalbouw op zijn spannendst: massa die zweeft."
+ },
+ {
+  "nummer": 12,
+  "naam": "PATINA",
+  "familie": "C",
+  "bestand": "img-021.jpg",
+  "materialen": "Groengrijs felsdak · wit stucwerk · lichte steen · houten kozijnkaders",
+  "beschrijving": "Het groengrijze felsdak refereert aan verweerd koper en geeft deze kap een zachtere toon dan het gebruikelijke antraciet. Wit stucwerk en hout houden de gevel licht. Een woning die eerder in het landschap lijkt gegroeid dan gebouwd."
+ },
+ {
+  "nummer": 13,
+  "naam": "LUIFEL",
+  "familie": "A",
+  "bestand": "img-005.jpg",
+  "materialen": "Zwart felswerk · verticaal hout · doorgetrokken houten luifel",
+  "beschrijving": "Het dakvlak zet zich voort in een royale houten luifel die het terras overkapt: binnen en buiten delen hier letterlijk hetzelfde dak. De gevel daaronder mag volledig open. Buitenleven als vast onderdeel van de plattegrond."
+ },
+ {
+  "nummer": 14,
+  "naam": "TRAVERTIJN",
+  "familie": "E",
+  "bestand": "img-020.jpg",
+  "materialen": "Travertin · bronskleurige luifelband · verticale houten lamellen",
+  "beschrijving": "Travertin geeft deze platte villa het gewicht van een klassiek landhuis, de bronzen luifelband maakt haar onmiskenbaar van nu. Lamellen filteren het licht bij de entree. Mediterrane rust, vertaald naar staalbouwprecisie."
+ },
+ {
+  "nummer": 15,
+  "naam": "HOOGOVEN",
+  "familie": "D",
+  "bestand": "img-027.jpg",
+  "materialen": "Cortenstaal · zwart felswerk · verticale lamellen",
+  "beschrijving": "Twee volumes in gesprek: een hoog cortenstalen hoofdvolume en een lagere zwarte metgezel. De verticale lamellen voor het glas laten de gevel ademen. Industrieel erfgoed als inspiratie, wooncomfort als resultaat."
+ },
+ {
+  "nummer": 16,
+  "naam": "SERRE",
+  "familie": "A",
+  "bestand": "img-007.jpg",
+  "materialen": "Zwart felswerk · naturel hout · glazen leefserre over de lengte",
+  "beschrijving": "Langs de volledige zongevel ligt een lage glazen leefzone die als moderne serre aan de kap is geschoven. Het hoofdvolume blijft gesloten en beschut, de serre doet het buitenleven. Twee klimaten, één vloeiende woning."
+ },
+ {
+  "nummer": 17,
+  "naam": "BELETAGE",
+  "familie": "E",
+  "bestand": "img-030.jpg",
+  "materialen": "Beige aluminium banden · houten lamellen · rondom glas",
+  "beschrijving": "Twee glazen woonlagen tussen drie strakke gevelbanden, met houten lamellen als filter. De verdieping is hier geen zolder maar een volwaardige beletage met dakterras. Stedelijke allure, ook midden in het groen."
+ },
+ {
+  "nummer": 18,
+  "naam": "MERGEL",
+  "familie": "B",
+  "bestand": "img-001.jpg",
+  "materialen": "Lichte kalksteen · verticaal hout · zwart felsdak",
+  "beschrijving": "De zachte, bijna mergelachtige steen geeft deze kap een tijdloze basis waar het hout warm tegen afsteekt. Het platte houten zijvolume vangt de entree. Een woning die over dertig jaar nog net zo vanzelfsprekend oogt als vandaag."
+ },
+ {
+  "nummer": 19,
+  "naam": "LANTAARN",
+  "familie": "A",
+  "bestand": "img-022.jpg",
+  "materialen": "Zwart felswerk · houten stijlenpui over twee lagen · glas",
+  "beschrijving": "Vrijwel de hele gevel is opgelost in een houten stijlenpui van maaiveld tot nok. Overdag een ingetogen zwarte kap, in de schemering een lantaarn die het erf verlicht. De constructieve eenvoud van staal maakt deze openheid mogelijk."
+ },
+ {
+  "nummer": 20,
+  "naam": "PORTAAL",
+  "familie": "F",
+  "bestand": "img-032.jpg",
+  "materialen": "Cortenstaal · zwart staal · kolossaal overstek op stalen kolommen",
+  "beschrijving": "Een loftwoning onder één groots gebaar: het dak steekt kolossaal uit en rust op ranke zwarte kolommen, als een portaal naar het landschap. Daarbinnen dubbelhoog glas en corten. Dit is de woning die laat zien wat een staalskelet werkelijk kan."
+ },
+ {
+  "nummer": 21,
+  "naam": "TERRAS",
+  "familie": "E",
+  "bestand": "img-016.jpg",
+  "materialen": "Lichte steen · zwart aluminium · glazen balustrades · lamellen",
+  "beschrijving": "Gestapelde volumes die telkens een dakterras aan de laag eronder cadeau doen. Lichte steen en zwart kader wisselen elkaar af, glazen balustrades houden het zicht vrij. Buitenruimte op elke verdieping, zonder één verloren meter."
+ },
+ {
+  "nummer": 22,
+  "naam": "STRAMIEN",
+  "familie": "A",
+  "bestand": "img-009.jpg",
+  "materialen": "Zwart felswerk · verticaal hout · steenstrips · entreeluifel",
+  "beschrijving": "Alles in deze gevel volgt één maatsysteem: de houten delen, de raamstroken, de luifel. Dat stramien geeft rust die je eerder voelt dan ziet. Vakwerk zit hier niet in ornament maar in ritme."
+ },
+ {
+  "nummer": 23,
+  "naam": "SINTEL",
+  "familie": "D",
+  "bestand": "img-029.jpg",
+  "materialen": "Zwart felswerk · cortenstalen bijvolume · naturel hout",
+  "beschrijving": "De zwarte kap draagt het wonen, het cortenstalen bijvolume het aankomen: entree en berging schuiven als een gloeiende sintel tegen het hoofdhuis. Hout verzacht de overgang. Twee materialen, ieder in hun eigen rol."
+ },
+ {
+  "nummer": 24,
+  "naam": "TWEELING",
+  "familie": "C",
+  "bestand": "img-014.jpg",
+  "materialen": "Groengrijs felswerk · lichte steen · stalen balkons · veel glas",
+  "beschrijving": "Twee identieke kappen, geschakeld door een glazen tussenlid: samen vormen ze één woning met de maat van een hofstede. Het groengrijze felswerk bindt de volumes. Groots wonen zonder één groot blok neer te zetten."
+ },
+ {
+  "nummer": 25,
+  "naam": "GEBINT",
+  "familie": "A",
+  "bestand": "img-017.jpg",
+  "materialen": "Naturel hout · zwart felsdak · stalen balkonhek in de topgevel",
+  "beschrijving": "Een brede kap met de goedmoedige verhoudingen van een oude schuur, maar met een volledig glazen topgevel waarin een balkon is opgenomen. Het houten gevelwerk loopt royaal door. De naam zegt het al: dit huis draagt zijn constructie met trots."
+ },
+ {
+  "nummer": 26,
+  "naam": "SPIEGEL",
+  "familie": "E",
+  "bestand": "img-024.jpg",
+  "materialen": "Travertin · bronskleurige daktrim · naturel hout · overloopzwembad",
+  "beschrijving": "Woning en waterpartij zijn hier één compositie: het platte volume vouwt in een L om het zwembad dat de gevel weerspiegelt. Travertin en brons houden het palet warm. Vakantiegevoel als permanent adres."
+ },
+ {
+  "nummer": 27,
+  "naam": "BRONS",
+  "familie": "B",
+  "bestand": "img-010.jpg",
+  "materialen": "Bronskleurig felsdak en -gevel · naturel hout · symmetrische kopgevel",
+  "beschrijving": "Een vrijwel symmetrische kopgevel met de voordeur exact in het hart: klassieke compositie, uitgevoerd in bronskleurig felswerk en hout. De eenvoud is bedrieglijk; juist hier telt elke maat. Ingetogen chic voor wie geen bewijsdrang heeft."
+ },
+ {
+  "nummer": 28,
+  "naam": "SOKKEL",
+  "familie": "A",
+  "bestand": "img-004.jpg",
+  "materialen": "Stapelsteen · verticaal hout · zwart felswerk",
+  "beschrijving": "Een ruw stenen gevelvlak draagt de kop van de woning als een sokkel het beeld. Daarboven nemen hout en zwart staal het over. De tactiliteit van de steen maakt dit ontwerp; je wilt er met je hand langs."
+ },
+ {
+  "nummer": 29,
+  "naam": "CORTEN",
+  "familie": "F",
+  "bestand": "img-033.jpg",
+  "materialen": "Cortenstaal · zwart staal · houten lamellen · glazen trappenhuis",
+  "beschrijving": "De cortenstalen bovenbouw kraagt uit over de leefverdieping en maakt van de woning een sculptuur. Het glazen trappenhuis toont de route door het huis als een verticale vitrine. Voor wie durft te wonen in een statement."
+ },
+ {
+  "nummer": 30,
+  "naam": "OPBOUW",
+  "familie": "E",
+  "bestand": "img-031.jpg",
+  "materialen": "Travertin · bronskleurige opbouw · houten lamellen",
+  "beschrijving": "Een serene bungalow in travertin, bekroond met één bronzen opbouw die als juwelendoos op het dak staat. Daarin de master met het beste uitzicht van het huis. Gelijkvloers wonen mét een verdieping voor de mooie momenten."
+ },
+ {
+  "nummer": 31,
+  "naam": "HAARD",
+  "familie": "A",
+  "bestand": "img-025.jpg",
+  "materialen": "Zwart felswerk · natuurstenen schoorsteenmassief · naturel hout",
+  "beschrijving": "Het natuurstenen schoorsteenmassief prikt door de nok en verankert de lange zwarte kap in het erf. Binnen belooft het precies wat buiten toont: een haard als hart van het huis. Archetype en avondlicht in één beeld."
+ },
+ {
+  "nummer": 32,
+  "naam": "HELLING",
+  "familie": "F",
+  "bestand": "img-028.jpg",
+  "materialen": "Zwart hout · betonnen plint · houten lamellen · lessenaarsdak",
+  "beschrijving": "Eén dakvlak dat in een lange lijn naar het licht klimt: het lessenaarsdak geeft elke ruimte binnen een eigen hoogte. De betonnen plint tilt het zwarte houtwerk vrij van de grond. Eigenzinnig zonder moeilijk te doen."
+ },
+ {
+  "nummer": 33,
+  "naam": "SCHAKEL",
+  "familie": "B",
+  "bestand": "img-018.jpg",
+  "materialen": "Bronskleurig felsdak · travertin · naturel hout",
+  "beschrijving": "Kap en plat volume zijn hier geschakeld tot één vloeiende compositie in brons, steen en hout. De entree ligt precies op de naad van de twee werelden. Een woning die laat zien dat een aanbouw geen compromis hoeft te zijn."
+ },
+ {
+  "nummer": 34,
+  "naam": "SUITE",
+  "familie": "E",
+  "bestand": "img-023.jpg",
+  "materialen": "Bronskleurig aluminium · travertin · houten lamellen · dubbelhoge entree",
+  "beschrijving": "Een tweelaagse compositie waarin elke gevel zijn eigen verhouding van steen, brons en lamellen krijgt. De dubbelhoge entreepartij ontvangt als een hotellobby. Wonen op suite-niveau, tot in de kleinste aansluiting gedacht."
+ }
+]

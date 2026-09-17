@@ -199,3 +199,161 @@ Ontwerptaal en inspiratie:
 Nog open:
 - Welke agenda voor het plannen van sessies (Cal.com, Calendly, of iets bestaands van EG Assembly of New Way)? Nodig uiterlijk in fase 3.
 - Is er een demo-moment of deadline waar de fasering rekening mee moet houden?
+
+## 5. De Klantreis
+
+Koerswijziging op de klantflow: de Live Architect wordt een begeleide
+klantreis in vijf stappen (0 tot 4), met een pratende Architect als
+gastheer. De bestaande kern (gebouwmodel, wetten, validatiepoort,
+materialen, klantgenerator) blijft onaangetast het fundament; de
+klantreis is een laag daarboven. De huidige app-flow (programma links,
+varianten rechts) gaat op in stap 2 en 3 van de reis.
+
+### 5.1 De Stem-Architect (kern van de ervaring)
+
+Techniek:
+- Spraakgesprek via de OpenAI Realtime API: spraak in, spraak uit,
+  Nederlands, function calling. WebRTC vanuit de browser rechtstreeks
+  naar OpenAI, met een kortlevend sessietoken.
+- De aangekondigde GPT-Live-API is nog niet beschikbaar. Daarom komt er
+  een dunne adapterlaag (src/architect/stem/adapter.js) met een klein
+  contract: start(sessie), stop(), zegTekst(tekst), onTranscript,
+  onFunctionCall(naam, args), onStatus. De Realtime-implementatie is de
+  eerste invulling; zodra GPT-Live opent schrijven we alleen een tweede
+  invulling van dit contract, de flow zelf blijft staan. De adapter
+  krijgt ook een testinvulling (zie gesprekstest) die tekst-turns
+  afspeelt zonder audio en zonder API-kosten.
+- De API-sleutel staat NOOIT in de browser. Een klein backend-endpoint
+  op Railway (POST /api/stem/sessie) maakt kortlevende sessietokens aan
+  volgens het standaard Realtime-patroon. Daar zit de kostenrem:
+  maximale gespreksduur per sessie [JIJ: voorstel 20 minuten] en een
+  dagelijks plafond over alle sessies samen [JIJ: voorstel 60 minuten
+  per dag]; bij bereiken schakelt de app zichtbaar en zonder drama over
+  op tekst.
+
+Persoonlijkheid en gedrag:
+- Eén persoonlijkheid: warm, vakkundig, kort van stof, Nederlands, en
+  altijd één vraag tegelijk. De systeemprompt is een bestand in de repo
+  (src/architect/stem/persoonlijkheid.js) zodat hij reviewbaar is en
+  meegroeit.
+- De Architect bedient de app uitsluitend via function calls; de app
+  voert uit en de sessie-state is altijd leidend. De stem kan niets wat
+  de knoppen niet kunnen. Eerste set functies: notitieMaken,
+  smaakToevoegen, stapAfronden, naarStap, parameterWijzigen,
+  setVerversen, favorietKiezen. Elke parameterwijziging gaat door de
+  bestaande validatiepoort (bouwModel, valideerModel, repareerModel);
+  wat de wetten niet haalt komt niet in beeld, en de Architect meldt
+  dan wat er wel kan.
+- Naast de stem ALTIJD een gelijkwaardige tekstinvoer plus ondertiteling
+  van wat de Architect zegt: zelfde gesprek, twee kanalen. Rumoerige
+  ruimtes, geen microfoon en toegankelijkheid zijn daarmee gedekt, en
+  de hele reis is zonder stem volledig te doorlopen.
+
+### 5.2 De stappen
+
+STAP 0, ONTVANGST. De Architect stelt zich voor, legt de stappen in een
+paar zinnen uit en vraagt of spreken oke is; zo niet, dan verloopt
+hetzelfde gesprek via tekst. Microfoontoestemming wordt pas hier
+gevraagd, nooit bij het laden van de pagina.
+
+STAP 1, SMAAK. De klant bladert door de conceptcollectie: 34 beelden
+uit bibliotheek/ in de repo-root, met stael-collectie.json als bron
+(nummer, naam, familie A tot F, materialen, beschrijving). Let op: het
+veld bestand in de JSON verwijst naar img-nummers die niet bestaan; de
+werkelijke bestanden heten 1.png tot 34.png, dus de koppeling wordt
+nummer naar nummer.png (met een controle in de bouw dat elk nummer een
+bestand heeft). De klant kiest 3 tot 5 favorieten; per favoriet vraagt
+de Architect wat erin aanspreekt (vorm, materiaal, sfeer, detail) en
+noteert dat in het smaakprofiel: gekozen nummers, families met
+telling, genoemde materialen, genoemde elementen en letterlijke
+citaten van de klant. Bibliotheek/ is klantmateriaal en staat volledig
+los van referenties/ (kalibratie).
+
+STAP 2, KAVEL EN PROGRAMMA. Adres zoeken via de PDOK Locatieserver
+(suggest en lookup), daarna een kaart met luchtfoto (PDOK
+Luchtfoto-WMTS) en de kadastrale perceelgrenzen uit de officiele
+Kadaster open data (Kadastrale Kaart via PDOK). De klant wijst zijn
+perceel aan; de oppervlakte komt uit de perceeldata. De Architect
+vraagt daarna het programma uit: toegestaan bebouwingspercentage of
+bouwvlak, gewenst woonoppervlak, verdiepingen, slaapkamers, badkamers,
+keuken en bijzonderheden (kantoor, garage, vide). Alles landt in het
+sessie-object en vult de bestaande programma-invoer.
+
+STAP 3, MODELLEN. De generator maakt 5 varianten gestuurd door
+smaakprofiel plus programma: de families en materialen uit stap 1
+bepalen de typologie-weging en de materiaalpresets (familie naar
+typologie en preset via een expliciete vertaaltabel in de kennisbank,
+zodat hij reviewbaar is). De verversknop geeft nieuwe sets met behoud
+van de favoriet. De klant kiest er een en bespreekt aanpassingen met de
+Architect; gesproken wensen worden via parameterWijzigen concrete
+parameterwijzigingen die door de validatiepoort gaan en live zichtbaar
+zijn. De Architect benoemt wat hij aanpast ("ik verlaag de goot naar
+2,6 meter") zodat stem en beeld elkaar bevestigen.
+
+STAP 4, BEELDEN. Van het gekozen model maakt de AI-fotostand
+fotorealistische renders per camerastandpunt, met het model als
+onderlegger (dit is fase 4 uit het bestaande plan, hier op zijn plek in
+de reis). Wensen op een beeld vloeien terug: gaat het over het GEBOUW,
+dan wijzigt het model en wordt opnieuw gerenderd; gaat het over het
+BEELD (licht, sfeer, standpunt), dan wijzigt alleen de render.
+
+### 5.3 Fundament
+
+- Eén sessie-object van stap 0 tot 4: smaakprofiel, notities, kavel
+  (adres, perceel-id, geometrie, oppervlakte), programma, gekozen model
+  (parameterset), renders. Opslag via de lichte Railway-backend met een
+  deel-token in de URL; geen accounts (conform het eerdere besluit).
+  Het gespreksverloop wordt bewaard als notities en beslissingen, nooit
+  als audio.
+- Zichtbare voortgang (stappen 1 tot 4) bovenin, terug kunnen naar een
+  eerdere stap zonder verlies, en de app blijft zonder stem volledig
+  bedienbaar. De sessie is na onderbreking via het deel-token te
+  hervatten.
+
+### 5.4 Bouwvolgorde
+
+Ik volg de voorgestelde volgorde A tot F; die is goed omdat elke stap
+op de vorige staat. Twee aanscherpingen, met motivatie:
+
+1. Binnen B bouw ik eerst de teksmodus af (function-call-skelet plus
+   tekstkanaal plus ondertiteling) en pas daarna de audio-aansluiting.
+   Zo zijn stap 1 tot 3 volledig testbaar zonder gesprekskosten, en de
+   gesprekstest draait tegen precies dezelfde function-call-laag.
+2. F (fotostand) is fase 4 uit het bestaande plan en hangt op de
+   AI-beeldpijplijn; die bouw ik binnen F en niet eerder, zodat A tot E
+   niet op een externe afhankelijkheid wachten.
+
+A. Backend-basis: Railway-project met het sessie-object (aanmaken,
+   lezen, bijwerken per stap), deel-token, en het Realtime-tokenendpoint
+   met kostenrem. Poort: API-tests (aanmaken, hervatten, token-limiet).
+B. Stap 0: de pratende Architect met tekst-fallback en ondertiteling,
+   adapterlaag met test-invulling, function-call-skelet, voortgangsbalk.
+   Poort: gesprekstest 0 (scripted ontvangst-dialoog).
+C. Stap 1: collectieweergave plus smaakprofiel. Poort: gesprekstest 1
+   (favorieten kiezen, doorvragen, profiel-inhoud) plus Playwright.
+D. Stap 2: PDOK-kaart plus programma-gesprek. Poort: gesprekstest 2
+   plus een vaste adres-fixture zodat de test niet van PDOK-uptime
+   afhangt.
+E. Stap 3: smaakprofiel naar generator (vertaaltabel families en
+   materialen) plus aanpasgesprek via parameterWijzigen. Poort:
+   massatest 500 plus gesprekstest 3 (wijzigingen komen door de
+   validatiepoort, afgewezen wensen krijgen een nette melding).
+F. Stap 4: fotostand. Poort: gesprekstest 4 plus beeldkeuring door
+   STAEL zelf voordat klanten renders zien.
+
+Vaste poorten per onderdeel: massatest 500 waar de generator geraakt
+wordt, Playwright desktop (1440x900) en mobiel (390x844), zelfkeuring
+als bouwer, en nieuw de gesprekstest per stap: een scripted dialoog
+(via de test-invulling van de adapter) die de function calls en de
+state-overgangen controleert zonder audio en zonder API-kosten. Commit
+en push per werkende stap.
+
+Open punten bij deze sectie:
+- Kostenrem-getallen: [JIJ: maximale gespreksduur per sessie en
+  dagplafond bevestigen of aanpassen].
+- Stemkeuze: de Realtime API heeft meerdere stemmen; ik zet een korte
+  Nederlandse proefopname van de kandidaten klaar in stap B en [JIJ:]
+  kiest.
+- Het veld bestand in stael-collectie.json corrigeren naar N.png of
+  bewust negeren ten gunste van het nummer; ik stel corrigeren voor
+  zodat de JSON zelfstandig klopt.
