@@ -100,19 +100,74 @@ function Wand({ wand, model }) {
   const geo = useMemo(() => wandGeometrie(wand), [wand])
   const m = useMemo(() => mat(model.kleuren.gevel), [model.kleuren.gevel])
   const vol = model.volumes[0]
+  // vaste conventie: lokaal z = WAND_DIKTE is ALTIJD het buitenvlak,
+  // zodat vullingen en gevel-elementen bij elke gevel buiten zitten
   let positie = [0, 0, 0], rotatie = [0, 0, 0]
   if (wand.type === 'kop') {
-    positie = [0, 0, wand.richting === 1 ? vol.d / 2 - WAND_DIKTE : -vol.d / 2]
+    rotatie = [0, wand.richting === 1 ? 0 : Math.PI, 0]
+    positie = [0, 0, wand.richting * (vol.d / 2 - WAND_DIKTE)]
   } else {
-    rotatie = [0, wand.kant === 1 ? -Math.PI / 2 : Math.PI / 2, 0]
-    positie = [wand.kant * vol.b / 2, 0, 0]
+    rotatie = [0, wand.kant * Math.PI / 2, 0]
+    positie = [wand.kant * (vol.b / 2 - WAND_DIKTE), 0, 0]
   }
   return (
     <group position={positie} rotation={rotatie}>
       <mesh geometry={geo} material={m} />
       {wand.sparingen.map(sp => <Vulling key={sp.id} sp={sp} kleuren={model.kleuren} />)}
+      {(wand.elementen || []).map((el, i) => <WandElement key={i} el={el} kleuren={model.kleuren} />)}
     </group>
   )
+}
+
+// gevel-elementen: de renderer kent alleen blok, strook en balkon;
+// alle plaatsing en clipping komt kant-en-klaar uit het model
+function WandElement({ el, kleuren }) {
+  const m = useMemo(() => mat(el.kleur || '#8a7a5e', .8), [el.kleur])
+  const donker = useMemo(() => mat(kleuren.kozijn, .5), [kleuren.kozijn])
+  if (el.type === 'blok') {
+    return (
+      <mesh material={m} position={[el.u, (el.v0 + el.v1) / 2, WAND_DIKTE + (el.uit ?? 0) + el.diep / 2]}>
+        <boxGeometry args={[el.b, el.v1 - el.v0, el.diep]} />
+      </mesh>
+    )
+  }
+  if (el.type === 'strook') {
+    const [u1, v1] = el.van, [u2, v2] = el.tot
+    const len = Math.hypot(u2 - u1, v2 - v1) + .02
+    return (
+      <mesh material={m}
+        position={[(u1 + u2) / 2, (v1 + v2) / 2, WAND_DIKTE + (el.uit ?? 0) + el.diep / 2]}
+        rotation={[0, 0, Math.atan2(v2 - v1, u2 - u1)]}>
+        <boxGeometry args={[len, el.b, el.diep]} />
+      </mesh>
+    )
+  }
+  if (el.type === 'balkon') {
+    const n = Math.max(8, Math.round(el.breedte / .15))
+    const z0 = WAND_DIKTE + .02
+    return (
+      <group position={[el.u, el.vloer, z0]}>
+        <mesh material={donker} position={[0, 0, el.diepte / 2]}>
+          <boxGeometry args={[el.breedte, .12, el.diepte]} />
+        </mesh>
+        <mesh material={donker} position={[0, .62, el.diepte - .03]}>
+          <boxGeometry args={[el.breedte, .05, .05]} />
+        </mesh>
+        {Array.from({ length: n + 1 }, (_, i) => (
+          <mesh key={i} material={donker}
+            position={[-el.breedte / 2 + (el.breedte / n) * i, .32, el.diepte - .03]}>
+            <boxGeometry args={[.03, .6, .03]} />
+          </mesh>
+        ))}
+        {[-1, 1].map(k => (
+          <mesh key={'z' + k} material={donker} position={[k * (el.breedte / 2 - .015), .62, el.diepte / 2]} rotation={[0, Math.PI / 2, 0]}>
+            <boxGeometry args={[el.diepte, .05, .05]} />
+          </mesh>
+        ))}
+      </group>
+    )
+  }
+  return null
 }
 
 // vlakmeetkunde van een dakvlak: richting nok->goot, normaal, lengte

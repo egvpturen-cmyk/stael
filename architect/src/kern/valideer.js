@@ -61,6 +61,38 @@ export function valideerModel(model) {
           fouten.push(wand.id + ': sparingen ' + wand.sparingen[i].id + ' en ' + wand.sparingen[j].id + ' overlappen')
       }
     }
+    // 2b. gevel-elementen: volledig binnen het gastvlak of exact
+    // geclipt; bekleding nooit over een sparing; balkon alleen met
+    // een pui (sparing) erachter
+    for (const el of wand.elementen || []) {
+      const punten = el.type === 'blok' ? [[el.u - el.b / 2, el.v1], [el.u + el.b / 2, el.v1]]
+        : el.type === 'strook' ? [el.van, el.tot] : []
+      for (const [u, v] of punten) {
+        const grensU = (wand.type === 'kop' ? vol.b / 2 : vol.d / 2) + .08
+        if (Math.abs(u) > grensU) { fouten.push(wand.id + ': gevel-element steekt buiten de gevelrand'); break }
+        const grensV = wand.type === 'kop' ? dakOnderY(Math.max(-vol.b / 2, Math.min(vol.b / 2, u)), vol) + .03 : vol.goot + .25
+        if (v > grensV) { fouten.push(wand.id + ': gevel-element doorsnijdt het dakvlak'); break }
+      }
+      if (el.bekleding) {
+        for (const sp of wand.sparingen) {
+          const pts = sp.poly || [[sp.rect.u - sp.rect.w / 2, sp.rect.v], [sp.rect.u + sp.rect.w / 2, sp.rect.v + sp.rect.h]]
+          const us = pts.map(q => q[0]), vs = pts.map(q => q[1])
+          if (el.u - el.b / 2 < Math.max(...us) - .01 && el.u + el.b / 2 > Math.min(...us) + .01
+            && el.v0 < Math.max(...vs) - .01 && el.v1 > Math.min(...vs) + .01)
+            fouten.push(wand.id + ': bekleding ligt over sparing ' + sp.id)
+        }
+      }
+      if (el.type === 'balkon') {
+        const achter = wand.sparingen.some(sp => {
+          const pts = sp.poly || [[sp.rect.u - sp.rect.w / 2, sp.rect.v], [sp.rect.u + sp.rect.w / 2, sp.rect.v + sp.rect.h]]
+          const us = pts.map(q => q[0]), vs = pts.map(q => q[1])
+          return Math.min(...us) < el.u + el.breedte / 2 && Math.max(...us) > el.u - el.breedte / 2
+            && Math.max(...vs) > el.vloer + .8
+        })
+        if (!achter) fouten.push(wand.id + ': balkon zonder pui erachter')
+      }
+    }
+
     // 3. bovenrand van de wand is de onderzijde van het dakpakket
     if (wand.type === 'kop') {
       for (const [u, v] of wand.contour) {

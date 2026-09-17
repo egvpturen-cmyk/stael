@@ -80,6 +80,17 @@ export function kopContour(vol) {
   return punten
 }
 
+// horizontaal bereik binnen de kopgevelcontour op hoogte v
+export function kopBereik(v, vol, marge = .12) {
+  const { b, goot, nok, nokOffset } = vol
+  if (v <= goot) return [-b / 2 + marge, b / 2 - marge]
+  if (v >= nok) return null
+  const f = (v - goot) / (nok - goot)
+  const uMin = -b / 2 + f * (nokOffset + b / 2) + marge
+  const uMax = b / 2 - f * (b / 2 - nokOffset) - marge
+  return uMax - uMin > .1 ? [uMin, uMax] : null
+}
+
 // sparingpolygon voor een pui die de dakcontour volgt, met marge
 function puiContour(vol, cx, breedte, marge, plint = .12) {
   const links = cx - breedte / 2, rechts = cx + breedte / 2
@@ -138,7 +149,7 @@ export function bouwModel(p) {
       id: 'kop' + (richting === 1 ? '+' : '-'), type: 'kop',
       richting, vlakZ: richting * vol.d / 2,
       contour: kopContour(vol),
-      sparingen: [], vulling: [],
+      sparingen: [], vulling: [], elementen: [],
     })
   }
   for (const kant of [1, -1]) {
@@ -146,7 +157,7 @@ export function bouwModel(p) {
       id: 'langs' + (kant === 1 ? '+' : '-'), type: 'langs',
       kant, vlakX: kant * vol.b / 2,
       contour: [[-vol.d / 2, 0], [vol.d / 2, 0], [vol.d / 2, vol.goot], [-vol.d / 2, vol.goot]],
-      sparingen: [], vulling: [],
+      sparingen: [], vulling: [], elementen: [],
     })
   }
   const wand = id => wanden.find(w => w.id === id)
@@ -182,6 +193,89 @@ export function bouwModel(p) {
         gast.sparingen.push({
           id: gast.id + '-raam-' + i, type: 'raam',
           rect: { u, v: plint, w: r.w ?? .9, h: top - plint },
+        })
+      }
+    }
+  }
+
+  // gevel-elementen: het gastvlak is de wand (de kopgevel is het
+  // expliciete geval), en alles wordt tegen de contour geclipt in het
+  // MODEL, zodat de renderer niets meer hoeft te raden
+  const dakY = u => dakOnderY(u, vol)
+  for (const e of p.gevelElementen || []) {
+    const gast = wand(e.wand)
+    if (!gast) continue
+    const kop = gast.type === 'kop'
+    const kleur = e.kleur || null
+    if (e.type === 'kader') {
+      // stroken die de daklijn volgen plus verticale stijlen tot de rand
+      const dik = e.dik ?? .28, uitst = .05
+      for (const kant of [1, -1]) {
+        const u = kant * (vol.b / 2 - dik / 2)
+        gast.elementen.push({ type: 'blok', u, v0: 0, v1: dakY(kant * vol.b / 2) - .02, b: dik, diep: .22, uit: uitst, kleur })
+      }
+      const stukken = vol.nok > vol.goot
+        ? [[-vol.b / 2 + dik, vol.nokOffset], [vol.nokOffset, vol.b / 2 - dik]] : []
+      for (const [u1, u2] of stukken) {
+        gast.elementen.push({
+          type: 'strook', van: [u1, dakY(u1) - .13], tot: [u2, dakY(u2) - .13],
+          b: .24, diep: .22, uit: uitst, kleur,
+        })
+      }
+    }
+    if (e.type === 'penanten') {
+      const n = e.n ?? 3
+      const span = e.span ?? vol.b * .5
+      for (let i = 1; i <= n; i++) {
+        const u = (e.u ?? 0) - span / 2 + (span / (n + 1)) * i
+        const v1 = Math.min(e.hMax ?? 1e9, dakY(u) - .15)
+        if (v1 > .4) gast.elementen.push({ type: 'blok', u, v0: .05, v1, b: e.b ?? .4, diep: .24, uit: .04, kleur })
+      }
+    }
+    if (e.type === 'lamellenveld') {
+      for (let v = e.v0; v <= e.v1; v += e.stap ?? .3) {
+        let u0 = (e.u ?? 0) - e.breedte / 2, u1 = (e.u ?? 0) + e.breedte / 2
+        if (kop) {
+          const ber = kopBereik(v, vol, .15)
+          if (!ber) continue
+          u0 = Math.max(u0, ber[0]); u1 = Math.min(u1, ber[1])
+        }
+        if (u1 - u0 > .25) gast.elementen.push({
+          type: 'strook', van: [u0, v], tot: [u1, v], b: .07, diep: .16, uit: e.uit ?? .12, kleur,
+        })
+      }
+    }
+    if (e.type === 'paneel') {
+      let v1 = e.v + e.h
+      if (kop) v1 = Math.min(v1, Math.min(dakY(e.u - e.b / 2), dakY(e.u + e.b / 2)) - .12)
+      if (v1 - e.v > .25) gast.elementen.push({ type: 'blok', u: e.u, v0: e.v, v1, b: e.b, diep: .06, uit: e.uit ?? .05, kleur })
+    }
+    if (e.type === 'balkon') {
+      gast.elementen.push({
+        type: 'balkon', u: e.u ?? 0, breedte: e.breedte ?? 3, vloer: e.vloer ?? 2.85, diepte: e.diepte ?? 1.5,
+      })
+    }
+  }
+  // plint: bekleding op de onderste band van alle wanden, automatisch
+  // uitgespaard rond de sparingen van elke wand
+  if (p.plint) {
+    for (const w2 of wanden) {
+      const grens = w2.type === 'kop' ? vol.b / 2 : vol.d / 2
+      let segmenten = [[-grens, grens]]
+      for (const sp of w2.sparingen) {
+        const pts = sp.poly || [[sp.rect.u - sp.rect.w / 2, sp.rect.v], [sp.rect.u + sp.rect.w / 2, sp.rect.v + sp.rect.h]]
+        const us = pts.map(q => q[0]), vs = pts.map(q => q[1])
+        if (Math.min(...vs) < p.plint.h) {
+          const a = Math.min(...us) - .02, b2 = Math.max(...us) + .02
+          segmenten = segmenten.flatMap(([s0, s1]) =>
+            b2 <= s0 || a >= s1 ? [[s0, s1]] : [[s0, Math.min(a, s1)], [Math.max(b2, s0), s1]])
+            .filter(([s0, s1]) => s1 - s0 > .05)
+        }
+      }
+      for (const [s0, s1] of segmenten) {
+        w2.elementen.push({
+          type: 'blok', u: (s0 + s1) / 2, v0: 0, v1: p.plint.h,
+          b: s1 - s0, diep: .04, uit: .01, kleur: p.plint.kleur, bekleding: true,
         })
       }
     }

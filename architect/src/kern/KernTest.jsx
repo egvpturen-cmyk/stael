@@ -62,6 +62,25 @@ export default function KernTest() {
     { naam: 'dakrand onderzijde', camera: { pos: [vol.b / 2 + 5, .8, vol.d / 2 - 1], doel: [vol.b / 2 + .6, vol.goot - 1.0, vol.d / 2 - 4], fov: 40 } },
     { naam: 'nok', camera: { pos: [2.5, vol.nok + 1.2, vol.d / 2 + 3.5], doel: [0, vol.nok - .3, vol.d / 2 - 1], fov: 35 } },
   ]
+  // stap 2: gevel-elementen met de kopgevel als gastvlak
+  const stap2 = maak({
+    ...BASIS,
+    volume: { b: 8, d: 12, goot: 3.2, helling: 48 },
+    plint: { h: .95, kleur: '#b09a72' },
+    gevelElementen: [
+      { wand: 'kop+', type: 'kader', kleur: '#26262a' },
+      { wand: 'kop+', type: 'lamellenveld', u: 0, breedte: 4.6, v0: 3.5, v1: 5.4, kleur: '#84705a' },
+      { wand: 'kop+', type: 'balkon', u: 0, breedte: 3, vloer: 2.9, diepte: 1.4 },
+      { wand: 'langs-', type: 'paneel', u: 2.5, v: .2, h: 2.4, b: 1.4, kleur: '#d8d4c9' },
+    ],
+  })
+  const v2 = stap2.model.volumes[0]
+  const stap2Zichten = [
+    { naam: 'kopgevel', camera: { pos: [1, 3.4, 17], doel: [0, 3.4, 0], fov: 38 } },
+    { naam: 'schuin', camera: { pos: [9, 4.5, 13], doel: [0, 3, 1], fov: 38 } },
+    { naam: 'plint en paneel', camera: { pos: [-v2.b / 2 - 4, 2, v2.d / 2 + 4], doel: [-1, 1.2, 2], fov: 38 } },
+  ]
+
   // de IFC-woning: 7,2 x 23,6 m, nok 7,88 m
   const ifcZichten = [
     { naam: 'totaal', camera: { pos: [15, 9, 19], doel: [0, 3.6, 0] } },
@@ -79,6 +98,8 @@ export default function KernTest() {
         model={strak.model} fouten={strak.fouten} zichten={strakZichten} />
       <Blok titel="kolossaal overstek (1,1 m), slank gedetailleerd met zichtbare kepers"
         model={kolossaal.model} fouten={kolossaal.fouten} zichten={kolZichten} />
+      <Blok titel="stap2: gevel-elementen op het gastvlak (kader, lamellen, balkon, plint, paneel)"
+        model={stap2.model} fouten={stap2.fouten} zichten={stap2Zichten} />
       <section>
         <div className="kernbloktitel"><h2>IFC-referentie: de gerealiseerde STÆL-woning (detaillering, niet de vorm)</h2></div>
         <div className="kernzichten">
