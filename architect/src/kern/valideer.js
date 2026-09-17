@@ -3,7 +3,7 @@
 // afleiding als de renderer). Een model dat faalt wordt gerepareerd of
 // verworpen; de renderer krijgt alleen gevalideerde modellen te zien.
 
-import { dakOnderY, nokProfiel, wandVol, WAND_DIKTE, dakVlak3D, snijlijn, lijnOpY } from './model.js'
+import { dakOnderY, nokProfiel, wandVol, WAND_DIKTE, dakVlak3D, snijlijn, lijnOpY, rectVan, terrasSegmenten, wandLokaalU } from './model.js'
 import { STAELDETAILS } from './staeldetails.js'
 import { leidGeometrieAf, dektPunt, wandTransform, inPolyMetGroei } from './afleiding.js'
 
@@ -55,7 +55,7 @@ export function schilFouten(model, opties = {}) {
     let gaten = 0, eerste = null
     for (let u = -grensU; u <= grensU; u += stap) {
       const vTop = (wand.type === 'kop' ? dakOnderY(u, vol) : vol.goot) - .04
-      for (let v = .04; v <= vTop; v += stap) {
+      for (let v = (vol.basis || 0) + .04; v <= vTop; v += stap) {
         if (inMasker(wand, u, v)) continue
         if (!dieptes.some(dz => {
           const P = wereld(t, u, v, dz)
@@ -191,7 +191,7 @@ export function elementFouten(model) {
       const begin = eerste.van || [eerste.u, eerste.v0]
       const eind = laatste.tot || [laatste.u, laatste.v1]
       for (const p of [begin, eind]) {
-        if (p[1] > .03) fouten.push(wand.id + ': keten ' + ketenId + ' eindigt zwevend op v=' + p[1].toFixed(2))
+        if (p[1] > (vol.basis || 0) + .03) fouten.push(wand.id + ': keten ' + ketenId + ' eindigt zwevend op v=' + p[1].toFixed(2))
       }
     }
   }
@@ -215,7 +215,7 @@ export function valideerModel(model, opties = {}) {
     // 1. elke sparing volledig binnen de gastwand
     for (const s of wand.sparingen) {
       for (const punt of sparingPunten(s)) {
-        if (punt[1] <= .01) continue
+        if (punt[1] <= (vol.basis || 0) + .01) continue
         if (wand.type === 'kop' && punt[1] >= dakOnderY(punt[0], vol) - .09) {
           fouten.push(wand.id + ': sparing ' + s.id + ' raakt het dakpakket'); break
         }
@@ -353,7 +353,78 @@ export function valideerModel(model, opties = {}) {
     }
   }
 
-  // 5c. samengestelde massa: de staartnok blijft onder de kopnok
+  // 5c. begaanbare daken: een terras heeft langs elke vrije rand een
+  // dekkende balustrade en een toegang op terrasniveau; een balustrade
+  // staat alleen op een begaanbare rand; een dakopbouw heeft zijn reden
+  // in het dakterras dat hij ontsluit
+  for (const vol of model.volumes) {
+    const balus = model.randafwerking.filter(r => r.type === 'balustrade' && r.volumeId === vol.id)
+    if (!vol.terras) {
+      if (balus.length) fouten.push(vol.id + ': balustrade op een niet-begaanbare dakrand')
+      continue
+    }
+    const niveau = vol.goot + vol.dakDikte
+    const segs = terrasSegmenten(model, vol)
+    for (const rand of ['kop+', 'kop-', 'langs+', 'langs-']) {
+      for (const [s0, s1] of segs[rand]) {
+        const item = balus.find(bl => bl.rand === rand)
+        const dekt = item && (item.bereiken || []).some(([a, b2]) => a <= s0 + .05 && b2 >= s1 - .05)
+        if (!dekt) fouten.push(vol.id + ': begaanbare dakrand ' + rand + ' zonder dekkende balustrade')
+        else if (item.h < 1.0) fouten.push(vol.id + ': balustrade op ' + rand + ' lager dan 1 m')
+      }
+    }
+    const occ = model.volumes.filter(o => o.id !== vol.id && Math.abs((o.basis || 0) - niveau) < .05)
+    const toegang = occ.some(o => model.wanden.filter(w => w.volumeId === o.id)
+      .some(w => w.sparingen.some(sp => sp.rect && sp.rect.w >= .8 && sp.rect.h >= 1.85
+        && sp.rect.v >= niveau - .02 && sp.rect.v <= niveau + .2)))
+    if (!toegang) fouten.push(vol.id + ': dakterras zonder toegang op terrasniveau')
+  }
+  for (const vol of model.volumes.filter(v => v.rol === 'opbouw')) {
+    const drager = model.volumes.find(o => Math.abs(o.goot + o.dakDikte - (vol.basis || 0)) < .05)
+    if (!drager || !drager.terras)
+      fouten.push(vol.id + ': dakopbouw zonder functie (geen dakterras dat hij ontsluit)')
+  }
+
+  // 5d. uitkraging: elke hoek van een gedragen doos die ruim buiten zijn
+  // drager ligt, staat op een kolom die tot de onderkant van de doos reikt
+  for (const vol of model.volumes.filter(v => (v.basis || 0) > .5)) {
+    const dragers = model.volumes.filter(o => o.id !== vol.id && Math.abs(o.goot + o.dakDikte - vol.basis) < .05)
+    const R = rectVan(vol)
+    const buiten = (x, z) => dragers.length === 0 ? 99 : Math.min(...dragers.map(o => {
+      const r = rectVan(o)
+      return Math.max(r.x0 - x, x - r.x1, r.z0 - z, z - r.z1, 0)
+    }))
+    const vrij = [[R.x0, R.z0], [R.x0, R.z1], [R.x1, R.z0], [R.x1, R.z1]]
+      .filter(([x, z]) => buiten(x, z) > .9)
+    if (!vrij.length) continue
+    const kol = model.randafwerking.find(r => r.type === 'stapelkolommen' && r.volumeId === vol.id)
+    if (!kol) { fouten.push(vol.id + ': uitkraging zonder kolommen onder de vrije hoeken'); continue }
+    for (const [x, z] of vrij) {
+      if (!kol.posities.some(([kx, kz]) => Math.hypot(kx - x, kz - z) < .75))
+        fouten.push(vol.id + ': vrije uitkraaghoek zonder kolom (x=' + x.toFixed(1) + ', z=' + z.toFixed(1) + ')')
+    }
+    if (Math.abs(kol.h - vol.basis) > .05)
+      fouten.push(vol.id + ': kolomhoogte sluit niet aan op de onderkant van de doos')
+  }
+
+  // 5e. pergola: binnen het gevelvlak, onder de dakrand, op stahoogte,
+  // en nooit over een contactzone
+  for (const rand of model.randafwerking.filter(r => r.type === 'pergola')) {
+    const vol = model.volumes.find(v => v.id === rand.volumeId)
+    if (rand.h < 2.2 || rand.h > vol.goot - .05)
+      fouten.push(vol.id + ': pergola op onlogische hoogte (h=' + rand.h.toFixed(2) + ')')
+    if (rand.z0 < -vol.d / 2 - .01 || rand.z1 > vol.d / 2 + .01)
+      fouten.push(vol.id + ': pergola steekt buiten de gevel')
+    const w = model.wanden.find(x => x.id === vol.id + ':langs' + (rand.kant === 1 ? '+' : '-'))
+    const u0 = Math.min(wandLokaalU(w, rand.z0), wandLokaalU(w, rand.z1))
+    const u1 = Math.max(wandLokaalU(w, rand.z0), wandLokaalU(w, rand.z1))
+    if (w.maskers.some(mk => {
+      const us = mk.poly.map(q => q[0])
+      return u0 < Math.max(...us) && u1 > Math.min(...us)
+    })) fouten.push(vol.id + ': pergola over een contactzone')
+  }
+
+  // 5f. samengestelde massa: de staartnok blijft onder de kopnok
   const kop = model.volumes.find(v => v.rol === 'kop')
   const staart = model.volumes.find(v => v.rol === 'staart')
   if (kop && staart && staart.nok > kop.nok - .35)

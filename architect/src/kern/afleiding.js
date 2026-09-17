@@ -6,7 +6,7 @@
 // Transformconventie (renderer en sampler identiek):
 //   wereld = translatie(pos) . rotatieY(ry) . rotatieZ(rz) . lokaal
 
-import { WAND_DIKTE, dakOnderY, vlakRichting } from './model.js'
+import { WAND_DIKTE, dakOnderY, vlakRichting, rectVan } from './model.js'
 import { STAELDETAILS } from './staeldetails.js'
 
 // volume-lokaal punt naar wereld: een dwarsvolume is om de y-as gedraaid
@@ -82,7 +82,7 @@ export function leidGeometrieAf(model, opties = {}) {
           size: [Math.hypot(u2 - u1, v2 - v1), .09, .18],
         })
       }
-      if (sp.type === 'pui') {
+      if (sp.type === 'pui' || sp.type === 'band') {
         const us = pts.map(p => p[0])
         const u0 = Math.min(...us), u1 = Math.max(...us)
         const stap = sp.stramien === 'grid' ? 1.05 : sp.stramien === 'vlak' ? 1.9 : .85
@@ -168,6 +168,13 @@ export function leidGeometrieAf(model, opties = {}) {
         vorm: 'box', rol: 'dak', kleur: K.dak,
         pos: volNaarWereld(vol, 0, vol.goot + vlak.dikte / 2, 0), ry: vry, rz: 0,
         size: [vol.b + .02, vlak.dikte, vol.d + .02],
+      })
+      // een gedragen doos heeft een onderplaat: onder een uitkraging is
+      // dat de zichtbare soffit, nooit een open onderkant
+      if (vol.basis) prims.push({
+        vorm: 'box', rol: 'vloer', kleur: K.gevel,
+        pos: volNaarWereld(vol, 0, vol.basis + .05, 0), ry: vry, rz: 0,
+        size: [vol.b + .02, .1, vol.d + .02],
       })
       continue
     }
@@ -320,6 +327,51 @@ export function leidGeometrieAf(model, opties = {}) {
           vorm: 'box', rol: 'kilkeper', kleur: K.dak,
           pos: mid, rot, size: [lenX + .12, rand.flank, rand.dikte],
         })
+      }
+    }
+    if (rand.type === 'balustrade') {
+      // hek op een begaanbare dakrand: hand- en voetregel per vrij
+      // segment, staanders exact op de segmentgrenzen
+      const R = rectVan(vol)
+      const y0 = vol.goot + vol.dakDikte
+      const langsX = rand.rand.startsWith('kop')
+      const vast = rand.rand === 'kop+' ? R.z1 - .06 : rand.rand === 'kop-' ? R.z0 + .06
+        : rand.rand === 'langs+' ? R.x1 - .06 : R.x0 + .06
+      const ry = langsX ? 0 : Math.PI / 2
+      const P = (m2, y) => langsX ? [m2, y, vast] : [vast, y, m2]
+      for (const [s0, s1] of rand.bereiken || []) {
+        const mid = (s0 + s1) / 2, len = s1 - s0
+        prims.push({ vorm: 'box', rol: 'balustrade', kleur: K.kozijn, pos: P(mid, y0 + rand.h - .02), ry, rz: 0, size: [len, .05, .05] })
+        prims.push({ vorm: 'box', rol: 'balustrade', kleur: K.kozijn, pos: P(mid, y0 + .1), ry, rz: 0, size: [len, .04, .04] })
+        const n = Math.max(2, Math.round(len / .8))
+        for (let i = 0; i <= n; i++) {
+          prims.push({ vorm: 'box', rol: 'balustrade', kleur: K.kozijn, pos: P(s0 + (len / n) * i, y0 + rand.h / 2), ry, rz: 0, size: [.035, rand.h, .035] })
+        }
+      }
+    }
+    if (rand.type === 'stapelkolommen') {
+      for (const [x, z] of rand.posities) {
+        prims.push({ vorm: 'box', rol: 'kolom', kleur: '#26262a', pos: [x, rand.h / 2, z], ry: 0, rz: 0, size: [.16, rand.h, .16] })
+      }
+    }
+    if (rand.type === 'pergola') {
+      // open lamellendak: kolommen buiten, twee liggers, lamellen die
+      // exact van ligger tot ligger spannen (element-afheid per constructie)
+      const x0 = rand.kant * vol.b / 2
+      const x1 = rand.kant * (vol.b / 2 + rand.diepte)
+      const y = rand.h
+      const kp = '#26262a'
+      for (const z of [rand.z0 + .12, rand.z1 - .12]) {
+        prims.push({ vorm: 'box', rol: 'kolom', kleur: kp, pos: volNaarWereld(vol, x1 - rand.kant * .07, y / 2, z), ry: vol.ry || 0, rz: 0, size: [.14, y, .14] })
+      }
+      for (const lx of [x0 + rand.kant * .06, x1 - rand.kant * .07]) {
+        prims.push({ vorm: 'box', rol: 'pergola', kleur: kp, pos: volNaarWereld(vol, lx, y - .09, (rand.z0 + rand.z1) / 2), ry: (vol.ry || 0) + Math.PI / 2, rz: 0, size: [rand.z1 - rand.z0, .18, .08] })
+      }
+      const n = Math.max(3, Math.round((rand.z1 - rand.z0 - .3) / rand.hoh))
+      const span = Math.abs(x1 - x0) - .08
+      for (let i = 0; i <= n; i++) {
+        const z = rand.z0 + .15 + ((rand.z1 - rand.z0 - .3) / n) * i
+        prims.push({ vorm: 'box', rol: 'pergola', kleur: kp, pos: volNaarWereld(vol, (x0 + x1) / 2, y - .04, z), ry: vol.ry || 0, rz: 0, size: [span, .12, .05] })
       }
     }
     if (rand.type === 'verandakolommen') {

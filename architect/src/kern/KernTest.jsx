@@ -146,6 +146,39 @@ export default function KernTest() {
     { naam: 'keuring goothoek', camera: { pos: [-11, 1.2, 0], doel: [-5.6, 3.2, -2.4], fov: 42 } },
     { naam: 'keuring hoog voor', camera: { pos: [-8, 11, 11], doel: [-3, 3.5, -2], fov: 40 } },
   ]
+  // stap 4: stapelmassa met terras, balustrade, glasbanden en pergola
+  const stapelM = maak({
+    seed: 1,
+    volume: { b: 9, d: 12, goot: 3 },
+    massa: { type: 'stapel', h1: 3, h2: 2.8, b2: 7, d2: 7.5, dx: -1, dz: -2, terras: true },
+    plint: { h: .9, kleur: '#b09a72' },
+    uitbouw: { type: 'pergola', kant: 1, diepte: 2.2, breedte: 3.4, z: 2 },
+    kleuren: BASIS.kleuren,
+  })
+  const stapel2M = maak({
+    seed: 2,
+    volume: { b: 8, d: 11, goot: 3.1 },
+    massa: {
+      type: 'stapel', h1: 3.1, h2: 2.9, b2: 8, d2: 6, dx: 3.4, dz: 1.2,
+      terras: true, opbouw: { b: 2.6, d: 2.2, h: 2.6 },
+    },
+    kleuren: BASIS.kleuren,
+  })
+  const stZichten = [
+    { naam: 'totaal', camera: { pos: [14, 7, 15], doel: [0, 3, 0] } },
+    { naam: 'terras en balustrade', camera: { pos: [7, 5.5, 11], doel: [1, 3.6, 2.5], fov: 38 } },
+    { naam: 'terrasdeur', camera: { pos: [3, 4.6, 9.5], doel: [-1, 4.2, 1.8], fov: 35 } },
+    { naam: 'pergola', camera: { pos: [10, 2.2, 8], doel: [5, 2.3, 2], fov: 42 } },
+    { naam: 'keuring laag voor', camera: { pos: [-8, 1.2, 12], doel: [0, 3, 0], fov: 42 } },
+    { naam: 'keuring hoog achter', camera: { pos: [-9, 10, -11], doel: [0, 3, 1], fov: 40 } },
+  ]
+  const st2Zichten = [
+    { naam: 'totaal', camera: { pos: [15, 7.5, 14], doel: [1.5, 3.5, 0] } },
+    { naam: 'carport onderdoor', camera: { pos: [11, 1.5, 6], doel: [5.5, 2.6, 0], fov: 45 } },
+    { naam: 'opbouw en bovendak', camera: { pos: [10, 11, 9], doel: [3.4, 6.3, 1.2], fov: 38 } },
+    { naam: 'balustrade bovendak', camera: { pos: [8.5, 8, 6.5], doel: [4.5, 6.4, 2], fov: 35 } },
+    { naam: 'keuring ver links', camera: { pos: [-12, 5, 13], doel: [0, 3.2, 0], fov: 40 } },
+  ]
   const ksZichten = [
     { naam: 'totaal', camera: { pos: [14, 7, 17], doel: [0, 3, 0] } },
     { naam: 'overgang kop-staart', camera: { pos: [8.5, 6.5, 6], doel: [1.2, 4.2, 2.4], fov: 35 } },
@@ -188,6 +221,10 @@ export default function KernTest() {
         model={dwarsM.model} fouten={dwarsM.fouten} zichten={dwZichten} />
       <Blok titel="dwarskap2: smal en steil op breed en flauw, kolossaal, verschoven"
         model={dwars2M.model} fouten={dwars2M.fouten} zichten={dw2Zichten} />
+      <Blok titel="stapel: dozen met terras, balustrade, glasbanden en pergola"
+        model={stapelM.model} fouten={stapelM.fouten} zichten={stZichten} />
+      <Blok titel="stapel2: uitkragende bovendoos op kolommen met carport en dakopbouw"
+        model={stapel2M.model} fouten={stapel2M.fouten} zichten={st2Zichten} />
       <Blok titel="kopstaart: hoog kopgebouw met lagere staart"
         model={kopstaart.model} fouten={kopstaart.fouten} zichten={ksZichten} />
       <Blok titel="aanbouw: geschakeld plat volume plus veranda op kolommen"

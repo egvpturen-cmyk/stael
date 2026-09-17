@@ -141,10 +141,43 @@ export function lijnOpY(lijn, y) {
 
 export function kopContour(vol) {
   const { b, goot, nok, nokOffset } = vol
-  const punten = [[-b / 2, 0], [b / 2, 0], [b / 2, goot]]
+  const basis = vol.basis || 0
+  const punten = [[-b / 2, basis], [b / 2, basis], [b / 2, goot]]
   if (!vol.plat && nok > goot) punten.push([nokOffset, nok])
   punten.push([-b / 2, goot])
   return punten
+}
+
+// wereld-voetafdruk van een volume zonder rotatie (gestapelde dozen)
+export function rectVan(vol) {
+  const [px, pz] = vol.pos || [0, 0]
+  return { x0: px - vol.b / 2, x1: px + vol.b / 2, z0: pz - vol.d / 2, z1: pz + vol.d / 2 }
+}
+
+// vrije randsegmenten van een begaanbaar dak: de dakranden minus de
+// stukken waar een doos van de volgende laag op de rand staat. Model en
+// validatie gebruiken dezelfde meetkunde (zoals bij nokProfiel).
+export function terrasSegmenten(model, dakVol) {
+  const niveau = dakVol.goot + dakVol.dakDikte
+  const R = rectVan(dakVol)
+  const occ = model.volumes.filter(o => o.id !== dakVol.id && Math.abs((o.basis || 0) - niveau) < .05)
+    .filter(o => { const r = rectVan(o); return r.x0 < R.x1 && r.x1 > R.x0 && r.z0 < R.z1 && r.z1 > R.z0 })
+  const uit = {}
+  for (const rand of ['kop+', 'kop-', 'langs+', 'langs-']) {
+    const langsX = rand.startsWith('kop')
+    let segs = [langsX ? [R.x0, R.x1] : [R.z0, R.z1]]
+    for (const o of occ) {
+      const r = rectVan(o)
+      const raakt = rand === 'kop+' ? r.z1 >= R.z1 - .05 : rand === 'kop-' ? r.z0 <= R.z0 + .05
+        : rand === 'langs+' ? r.x1 >= R.x1 - .05 : r.x0 <= R.x0 + .05
+      if (!raakt) continue
+      const [a, b] = langsX ? [r.x0, r.x1] : [r.z0, r.z1]
+      segs = segs.flatMap(([s0, s1]) => b <= s0 + .01 || a >= s1 - .01 ? [[s0, s1]]
+        : [[s0, Math.min(a, s1)], [Math.max(b, s0), s1]]).filter(([s0, s1]) => s1 - s0 > .3)
+    }
+    uit[rand] = segs
+  }
+  return uit
 }
 
 export function kopBereik(v, vol, marge = .12) {
@@ -185,6 +218,7 @@ function maakVolume(id, rol, v, rand, opties = {}) {
   const vol = {
     id, rol, plat,
     b: v.b, d: v.d, goot: v.goot, nok, nokOffset: v.nokOffset || 0,
+    basis: v.basis || 0,
     dakDikte: v.dakDikte ?? (plat ? .14 : STAELDETAILS.dak.dikte),
     familie,
     dakInzet: !plat && familie === 'strak' ? STAELDETAILS.strak.dakInzet / cosH : 0,
@@ -221,7 +255,7 @@ function maakVolume(id, rol, v, rand, opties = {}) {
   for (const kant of [1, -1]) {
     wanden.push({
       id: id + ':langs' + (kant === 1 ? '+' : '-'), volumeId: id, type: 'langs',
-      kant, contour: [[-vol.d / 2, 0], [vol.d / 2, 0], [vol.d / 2, vol.goot], [-vol.d / 2, vol.goot]],
+      kant, contour: [[-vol.d / 2, vol.basis], [vol.d / 2, vol.basis], [vol.d / 2, vol.goot], [-vol.d / 2, vol.goot]],
       sparingen: [], elementen: [], maskers: [],
     })
   }
@@ -270,6 +304,38 @@ function verwijderRand(model, volumeId, test) {
   model.randafwerking = model.randafwerking.filter(r => !(r.volumeId === volumeId && test(r)))
 }
 
+// doorlopende glasband in een wand, geknipt rond bestaande sparingen,
+// maskers en opliggende elementen (een band achter een poort bestaat niet)
+function voegGlasband(w2, vol2, v0, v1) {
+  if (!w2 || v1 - v0 < .55) return
+  const halve = (w2.type === 'kop' ? vol2.b : vol2.d) / 2 - .45
+  if (halve < .5) return
+  let segs = [[-halve, halve]]
+  const knip = (a, b2) => {
+    segs = segs.flatMap(([s0, s1]) => b2 <= s0 || a >= s1 ? [[s0, s1]]
+      : [[s0, Math.min(a, s1)], [Math.max(b2, s0), s1]]).filter(([s0, s1]) => s1 - s0 > .7)
+  }
+  for (const sp of w2.sparingen) {
+    const pts = sp.poly || [[sp.rect.u - sp.rect.w / 2, 0], [sp.rect.u + sp.rect.w / 2, 0]]
+    const us = pts.map(q => q[0])
+    knip(Math.min(...us) - .22, Math.max(...us) + .22)
+  }
+  for (const mk of w2.maskers) {
+    const us = mk.poly.map(q => q[0])
+    knip(Math.min(...us) - .1, Math.max(...us) + .1)
+  }
+  for (const el of w2.elementen || []) {
+    if (el.type === 'blok') knip(el.u - el.b / 2 - .15, el.u + el.b / 2 + .15)
+  }
+  let n = 0
+  for (const [s0, s1] of segs) {
+    w2.sparingen.push({
+      id: w2.id + '-band-' + n++, type: 'band',
+      rect: { u: (s0 + s1) / 2, v: v0, w: s1 - s0, h: v1 - v0 },
+    })
+  }
+}
+
 // ---- bouwModel: parameterset -> gebouwmodel met relaties ----
 export function bouwModel(p) {
   const model = { seed: p.seed ?? 1, volumes: [], wanden: [], dakvlakken: [], randafwerking: [] }
@@ -281,6 +347,7 @@ export function bouwModel(p) {
   }
   const wand = id => model.wanden.find(w => w.id === id)
   const volVan = w => model.volumes.find(v => v.id === w.volumeId)
+  const naSparingen = []
 
   const uitbouw = p.uitbouw || null
   const hoofdOpties = {}
@@ -331,6 +398,105 @@ export function bouwModel(p) {
     model.randafwerking.find(r => r.volumeId === 'staart' && r.type === 'nokvouw').diepteVoor = staart.vol.d / 2 + .02
     hoofdWandId = w => (w === 'kop+' ? 'kop:kop+' : w.startsWith('langs') ? 'staart:' + w : 'kop:' + w)
     // raamritme hoort bij de staart, pui en kopelementen bij de kop
+  } else if (p.massa?.type === 'stapel') {
+    // gestapelde platte dozen: per rand een duidelijke inzet (>= .35) of
+    // uitkraging (>= .5); coplanaire gevels boven elkaar bestaan hier
+    // niet, die rand is niet te detailleren. Vrije uitkraaghoeken staan
+    // op kolommen; een begaanbaar dak bestaat alleen met balustrade en
+    // toegang, en een dakopbouw ontsluit het terras waarop hij staat.
+    const m = p.massa
+    const klem = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
+    const b1 = p.volume.b, d1 = p.volume.d
+    const h1 = klem(m.h1 ?? 3.1, 2.7, 4)
+    const onder = maakVolume('onder', 'onder', { b: b1, d: d1, goot: h1, plat: true }, null)
+    voeg(onder)
+    const basis = h1 + onder.vol.dakDikte
+    const h2 = klem(m.h2 ?? 2.9, 2.6, 3.6)
+    // de bovendoos deelt altijd een kern met de onderdoos (trapzone)
+    const schuif = (c, half1, half2) => {
+      const T = Math.min(2.2, 2 * half1 - .1, 2 * half2)
+      return Math.max(-(half1 + half2 - T), Math.min(half1 + half2 - T, c))
+    }
+    const fixAs = (c, half1, half2) => {
+      let xL = c - half2, xR = c + half2
+      const f = o => (o > -.35 && o < .5) ? (o < .1 ? -.35 : .5) : o
+      xL = -half1 - f(-half1 - xL)
+      xR = half1 + f(xR - half1)
+      if (xR - xL < 2.6) xR = xL + 2.6
+      return [(xL + xR) / 2, xR - xL]
+    }
+    const [cx, b2] = fixAs(schuif(m.dx ?? 0, b1 / 2, (m.b2 ?? b1 * .85) / 2), b1 / 2,
+      klem(m.b2 ?? b1 * .85, 2.6, b1 + 3.2) / 2)
+    const [cz, d2] = fixAs(schuif(m.dz ?? 0, d1 / 2, (m.d2 ?? d1 * .7) / 2), d1 / 2,
+      klem(m.d2 ?? d1 * .7, 2.6, d1 + 3.2) / 2)
+    const boven = maakVolume('boven', 'boven', {
+      b: b2, d: d2, goot: basis + h2, plat: true, basis, pos: [cx, cz],
+    }, null)
+    voeg(boven)
+    const rOnder = rectVan(onder.vol), rBoven = rectVan(boven.vol)
+    // kolommen onder elke hoek die meer dan .9 buiten de onderdoos ligt
+    const buitenRect = (x, z, r) => Math.max(r.x0 - x, x - r.x1, r.z0 - z, z - r.z1, 0)
+    const posities = []
+    for (const [hx, hz] of [[rBoven.x0, rBoven.z0], [rBoven.x0, rBoven.z1], [rBoven.x1, rBoven.z0], [rBoven.x1, rBoven.z1]]) {
+      if (buitenRect(hx, hz, rOnder) > .9)
+        posities.push([hx - Math.sign(hx - cx || 1) * .15, hz - Math.sign(hz - cz || 1) * .15])
+    }
+    if (posities.length) model.randafwerking.push({ type: 'stapelkolommen', volumeId: 'boven', posities, h: basis })
+    // dakopbouw op de bovendoos, met zijn deur als terrastoegang
+    if (m.opbouw) {
+      const basis2 = basis + h2 + boven.vol.dakDikte
+      const b3 = klem(m.opbouw.b ?? 2.5, 1.8, b2 - .9)
+      const d3 = klem(m.opbouw.d ?? 2.2, 1.6, d2 - .9)
+      const h3 = klem(m.opbouw.h ?? 2.6, 2.4, 3)
+      const op = maakVolume('opbouw', 'opbouw', {
+        b: b3, d: d3, goot: basis2 + h3, plat: true, basis: basis2, pos: [cx, cz],
+      }, null)
+      voeg(op)
+      const dOp = wand('opbouw:kop+')
+      dOp.sparingen.push({
+        id: dOp.id + '-deur', type: 'deur',
+        rect: { u: 0, v: basis2 + .1, w: .9, h: Math.min(2.2, h3 - .3) },
+      })
+    }
+    const maakTerras = vol2 => {
+      vol2.terras = true
+      const segs = terrasSegmenten(model, vol2)
+      for (const rand2 of ['kop+', 'kop-', 'langs+', 'langs-']) {
+        if (segs[rand2].length) model.randafwerking.push({
+          type: 'balustrade', volumeId: vol2.id, rand: rand2, bereiken: segs[rand2], h: 1.05,
+        })
+      }
+    }
+    // onderdak begaanbaar: alleen als er een terraszijde met diepte is,
+    // met een deur op terrasniveau; anders geen terras en geen hek
+    if (m.terras !== false) {
+      const kandidaten = [
+        ['boven:langs-', rBoven.x0 - rOnder.x0], ['boven:langs+', rOnder.x1 - rBoven.x1],
+        ['boven:kop-', rBoven.z0 - rOnder.z0], ['boven:kop+', rOnder.z1 - rBoven.z1],
+      ].filter(k => k[1] >= 1.05).sort((a, b) => b[1] - a[1])
+      if (kandidaten.length) {
+        const dw = wand(kandidaten[0][0])
+        dw.sparingen.push({
+          id: dw.id + '-terrasdeur', type: 'deur',
+          rect: { u: 0, v: basis + .1, w: .95, h: Math.min(2.3, h2 - .32) },
+        })
+        maakTerras(onder.vol)
+      }
+    }
+    if (m.opbouw) maakTerras(boven.vol)
+    // glasbanden per laag, geknipt rond deuren en elementen; ze worden
+    // pas gelegd als alle sparingen en gevel-elementen bekend zijn
+    naSparingen.push(() => {
+      for (const [vol2, v0, v1] of [
+        [onder.vol, .95, h1 - .3],
+        [boven.vol, basis + .95, basis + h2 - .3],
+      ]) {
+        for (const wnaam of ['kop+', 'kop-', 'langs+', 'langs-']) {
+          voegGlasband(wand(vol2.id + ':' + wnaam), vol2, v0, v1)
+        }
+      }
+    })
+    hoofdWandId = w => 'onder:' + w
   } else {
     voeg(maakVolume('hoofd', 'hoofd', p.volume, p.rand, hoofdOpties))
   }
@@ -472,6 +638,28 @@ export function bouwModel(p) {
       })
     }
     verwijderRand(model, 'aanbouw', r => r.type === 'daklijst' && r.rand === (m.kant === 1 ? 'langs-' : 'langs+'))
+  }
+
+  // ---- pergola: open lamellendak tegen een langsgevel op maaiveld ----
+  if (uitbouw?.type === 'pergola') {
+    const doel = model.volumes.find(v => v.rol === 'onder')
+      || model.volumes.find(v => v.rol === 'staart') || model.volumes[0]
+    const kant = uitbouw.kant === -1 ? -1 : 1
+    const diepte = Math.max(1.4, Math.min(uitbouw.diepte ?? 2.4, 3.6))
+    const breedte = Math.max(2, Math.min(uitbouw.breedte ?? doel.d * .45, doel.d - .6))
+    const zc = Math.max(-doel.d / 2 + breedte / 2 + .2, Math.min(doel.d / 2 - breedte / 2 - .2, uitbouw.z ?? 0))
+    const h = Math.min(2.7, doel.goot - .15)
+    const w2 = model.wanden.find(w3 => w3.id === doel.id + ':langs' + (kant === 1 ? '+' : '-'))
+    const u0 = wandLokaalU(w2, zc - breedte / 2), u1 = wandLokaalU(w2, zc + breedte / 2)
+    const overlapt = w2.maskers.some(mk => {
+      const us = mk.poly.map(q => q[0])
+      return Math.min(u0, u1) < Math.max(...us) && Math.max(u0, u1) > Math.min(...us)
+    })
+    // tegen een contactzone (aanbouw, dwarskap) bestaat de pergola niet
+    if (h >= 2.2 && !overlapt) model.randafwerking.push({
+      type: 'pergola', volumeId: doel.id, kant,
+      z0: zc - breedte / 2, z1: zc + breedte / 2, diepte, h, hoh: .42,
+    })
   }
 
   // ---- sparingen ----
@@ -646,10 +834,14 @@ export function bouwModel(p) {
     }
   }
 
+  // uitgestelde stappen (glasbanden) nu alle sparingen en elementen er zijn
+  for (const f of naSparingen) f()
+
   // ---- plint: bekleding, automatisch uitgespaard rond sparingen ----
   if (p.plint) {
     for (const w2 of model.wanden) {
       const gv = volVan(w2)
+      if (gv.basis) continue // plint hoort bij maaiveld
       const grens = w2.type === 'kop' ? gv.b / 2 : gv.d / 2
       const h = Math.min(p.plint.h, gv.goot - .15)
       if (h < .2) continue

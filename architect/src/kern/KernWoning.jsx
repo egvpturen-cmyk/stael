@@ -17,7 +17,7 @@ function matVoor(kleur, rol) {
   if (!matCache.has(sleutel)) {
     const eig = rol === 'glas' ? { roughness: .14, metalness: .08 }
       : rol === 'dak' || rol === 'nokvouw' ? { roughness: .6, metalness: .1 }
-      : rol === 'kozijn' || rol === 'balkon' || rol === 'windveer' || rol === 'randprofiel' || rol === 'gording' ? { roughness: .5, metalness: .2 }
+      : rol === 'kozijn' || rol === 'balkon' || rol === 'windveer' || rol === 'randprofiel' || rol === 'gording' || rol === 'balustrade' || rol === 'pergola' || rol === 'kolom' ? { roughness: .5, metalness: .2 }
       : { roughness: .85, metalness: 0 }
     matCache.set(sleutel, new THREE.MeshStandardMaterial({ color: kleur, ...eig }))
   }
