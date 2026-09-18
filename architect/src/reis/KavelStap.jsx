@@ -140,8 +140,10 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
     await legProgrammaVast()
     const klaar = await functies.voerUit('stapAfronden', { stap: 2 })
     if (!klaar.ok) { zetMelding(klaar.fout); return }
-    await functies.voerUit('naarStap', { stap: 3 })
-    meldArchitect('Kavel en programma zijn compleet. Dan gaan we nu modellen bekijken.')
+    const volgende = await functies.voerUit('naarStap', { stap: 3 })
+    meldArchitect(volgende.beschikbaar
+      ? 'Kavel en programma zijn compleet. Dan gaan we nu modellen bekijken.'
+      : 'Kavel en programma zijn compleet. De modellenstap volgt binnenkort.')
   }
 
   // kaart opbouwen zodra er een kavelbron of bewaarde kavel is

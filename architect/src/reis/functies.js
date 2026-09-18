@@ -22,6 +22,11 @@ export function ringOppervlakteM2(punten) {
   return Math.abs(som / 2)
 }
 
+// stappen die in de app echt gebouwd zijn; de resultaten van naarStap
+// en stapAfronden melden dit, en de Architect belooft alleen wat hier
+// bevestigd wordt (nooit een stap die nog moet komen)
+export const GEBOUWDE_STAPPEN = [0, 1, 2]
+
 export function maakFuncties({ token, sessieRef, opUiSignaal }) {
   const sessie = () => sessieRef.huidige
   const zet = async updates => {
@@ -204,14 +209,22 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
         }
       }
       signaal('stapAfgerond', { stap })
-      return { ok: true, stap }
+      const volgendeBeschikbaar = GEBOUWDE_STAPPEN.includes(stap + 1)
+      return {
+        ok: true, stap, volgendeStapBeschikbaar: volgendeBeschikbaar,
+        ...(volgendeBeschikbaar ? {} : { let: 'de volgende stap is nog niet beschikbaar in de app; rond af met de melding dat die binnenkort volgt en beloof hem niet nu' }),
+      }
     },
 
     async naarStap({ stap }) {
       if (!Number.isInteger(stap) || stap < 0 || stap > 4) return { ok: false, fout: 'stap moet 0 tot 4 zijn' }
       await zet({ stap })
       signaal('stap', { stap })
-      return { ok: true, stap }
+      const beschikbaar = GEBOUWDE_STAPPEN.includes(stap)
+      return {
+        ok: true, stap, beschikbaar,
+        ...(beschikbaar ? {} : { let: 'deze stap is nog niet ingericht in de app; meld dat hij binnenkort volgt en beloof er nu niets over' }),
+      }
     },
 
     // parameterWijzigen en setVerversen krijgen hun echte uitvoering in

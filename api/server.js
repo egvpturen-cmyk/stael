@@ -20,6 +20,30 @@ import { collectieContext } from './collectie.js'
 
 const SYSTEEM = PERSOONLIJKHEID + '\n\n' + collectieContext()
 
+// De actuele sessiestand gaat als context mee in elke systeemprompt
+// (tekst en spraak), zodat de Architect na hervatten altijd verder
+// gaat waar de klant was en nooit opnieuw kennismaakt.
+function sessieContext(sessie) {
+  if (!sessie) return ''
+  const r = ['', '', 'SESSIECONTEXT (actuele stand uit de app; dit is al gebeurd):', 'huidige stap: ' + sessie.stap]
+  const smaak = sessie.smaak || {}
+  if (smaak.favorieten?.length) {
+    r.push('favorieten (collectienummers): ' + smaak.favorieten.join(', '))
+    if (Object.keys(smaak.families || {}).length) r.push('familietelling: ' + JSON.stringify(smaak.families))
+    if (smaak.materialen?.length) r.push('genoemde materialen: ' + smaak.materialen.join(', '))
+    if (smaak.elementen?.length) r.push('genoemde elementen: ' + smaak.elementen.join(', '))
+    if (smaak.citaten?.length) r.push('citaten van de klant: ' + smaak.citaten.map(c => '"' + c + '"').join(' | '))
+  }
+  if (sessie.kavel) {
+    r.push('kavel: ' + (sessie.kavel.adres || 'zonder adres') + ', ' + sessie.kavel.oppervlakte + ' m2 ('
+      + (sessie.kavel.herkomst || 'kadastraal') + (sessie.kavel.perceelnummer ? ', perceel ' + sessie.kavel.sectie + ' ' + sessie.kavel.perceelnummer : '') + ')')
+  }
+  if (sessie.programma) r.push('programma van eisen: ' + JSON.stringify(sessie.programma))
+  r.push('Is de huidige stap groter dan 0, dan is de kennismaking al geweest: stel jezelf NIET opnieuw voor, '
+    + 'leg de stappen niet opnieuw uit en ga direct verder bij de huidige stap en de vastgelegde stand hierboven.')
+  return r.join('\n')
+}
+
 const app = express()
 const opslag = await maakOpslag()
 
@@ -90,7 +114,8 @@ app.patch('/api/sessies/:token', async (req, res) => {
 // uitgeven dan het plafond, ook als een gesprek korter duurt)
 app.post('/api/stem/sessie', async (req, res) => {
   const sessieToken = req.body?.sessieToken
-  if (!sessieToken || !(await opslag.sessieLees(sessieToken))) {
+  const sessieStand = sessieToken ? await opslag.sessieLees(sessieToken) : null
+  if (!sessieStand) {
     return res.status(404).json({ fout: 'onbekende sessie' })
   }
   const verbruikt = await opslag.verbruikVandaag()
@@ -125,7 +150,7 @@ app.post('/api/stem/sessie', async (req, res) => {
         // ook als een session.update in de browser zou mislukken
         session: {
           type: 'realtime', model,
-          instructions: SYSTEEM,
+          instructions: SYSTEEM + sessieContext(sessieStand),
           tools: FUNCTIES.map(f => ({ type: 'function', ...f })),
           audio: {
             input: { transcription: { model: 'whisper-1' } },
@@ -164,7 +189,8 @@ app.post('/api/stem/sessie', async (req, res) => {
 // de gespreksgeschiedenis (user, assistant, tool) aan
 app.post('/api/stem/tekst', async (req, res) => {
   const { sessieToken, berichten } = req.body || {}
-  if (!sessieToken || !(await opslag.sessieLees(sessieToken))) {
+  const sessieStand = sessieToken ? await opslag.sessieLees(sessieToken) : null
+  if (!sessieStand) {
     return res.status(404).json({ fout: 'onbekende sessie' })
   }
   if (!Array.isArray(berichten) || berichten.length === 0 || berichten.length > 120) {
@@ -173,8 +199,10 @@ app.post('/api/stem/tekst', async (req, res) => {
   if (berichten.some(b => !['user', 'assistant', 'tool'].includes(b.role))) {
     return res.status(400).json({ fout: 'alleen user, assistant en tool zijn toegestaan' })
   }
+  const systeem = SYSTEEM + sessieContext(sessieStand)
   if (process.env.STEM_TEST_MODUS === '1') {
-    return res.json({ tekst: 'testmodus: gebruik de scripted adapter', functieAanroepen: [], testModus: true })
+    // de tests verifieren zo dat de sessiecontext echt meegaat
+    return res.json({ tekst: 'testmodus: gebruik de scripted adapter', functieAanroepen: [], testModus: true, systeem })
   }
   if (!process.env.OPENAI_API_KEY) {
     return res.status(503).json({ fout: 'architect niet beschikbaar (geen sleutel)' })
@@ -186,7 +214,7 @@ app.post('/api/stem/tekst', async (req, res) => {
       body: JSON.stringify({
         model: process.env.STEM_TEKST_MODEL || 'gpt-4.1-mini',
         max_tokens: 500,
-        messages: [{ role: 'system', content: SYSTEEM }, ...berichten],
+        messages: [{ role: 'system', content: systeem }, ...berichten],
         tools: FUNCTIES.map(f => ({ type: 'function', function: f })),
       }),
     })
