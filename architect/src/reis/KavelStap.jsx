@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { LUCHTFOTO, pdokFixtureAan } from './pdok.js'
+import { LUCHTFOTO, pdokFixtureAan, zoekGebied } from './pdok.js'
 
 // Stap 2: kavel en programma. De klant zoekt het adres, wijst het
 // eigen perceel aan op de luchtfoto met kadastrale grenzen, en legt
@@ -123,10 +123,16 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
       if (el) el.setAttribute('data-perceel', l.feature.properties.id)
     })
     perceelLaag.current = laag
-    // het kaartbeeld volgt altijd de geladen percelenlaag, zodat er
-    // nooit kaart zonder aanwijsbare percelen in beeld staat
-    if (bron.percelen.length) {
-      kaartRef.current.fitBounds(laag.getBounds().pad(0.04), { maxZoom: 18 })
+    // scherpstellen op het zoekgebied rond het adres: daarbinnen is
+    // elk stuk kaart per constructie gedekt door geladen percelen
+    // (de laag zelf kan kilometerslange weg- en dijkpercelen bevatten
+    // die het beeld anders ver zouden laten uitzoomen); bij hervatten
+    // zonder verse zoekactie stelt de kaart scherp op het gekozen
+    // perceel zelf
+    if (kavelBron && bron.adres.lon != null) {
+      kaartRef.current.fitBounds(zoekGebied(bron.adres.lon, bron.adres.lat), { maxZoom: 18 })
+    } else if (bron.percelen.length) {
+      kaartRef.current.fitBounds(laag.getBounds().pad(0.3), { maxZoom: 18 })
     }
     return undefined
   }, [kavelBron, kavel?.perceelId])

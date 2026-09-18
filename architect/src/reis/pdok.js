@@ -66,8 +66,19 @@ export function normaliseerPercelen(featureCollection) {
   })).filter(p => p.geometrie && Number.isFinite(p.oppervlakte))
 }
 
+export const ZOEKSTRAAL_M = 220
+
+// Het zoekgebied rond een adres als Leaflet-bounds: binnen dit kader
+// is elk stuk kaart gedekt door de geladen percelen, dus hierop mag
+// het kaartbeeld veilig scherpstellen.
+export function zoekGebied(lon, lat, meters = ZOEKSTRAAL_M) {
+  const dLat = meters / 111320
+  const dLon = meters / (111320 * Math.cos(lat * Math.PI / 180))
+  return [[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]]
+}
+
 // Kadastrale percelen rond een punt.
-export async function percelenRond(lon, lat, meters = 220) {
+export async function percelenRond(lon, lat, meters = ZOEKSTRAAL_M) {
   if (fixture) return { percelen: normaliseerPercelen(WFS_TESTDATA) }
   const dLat = meters / 111320
   const dLon = meters / (111320 * Math.cos(lat * Math.PI / 180))
