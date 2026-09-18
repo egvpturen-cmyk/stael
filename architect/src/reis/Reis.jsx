@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { sessieMaak, sessieLees } from './api.js'
 import { maakFuncties } from './functies.js'
 import { maakTekstAdapter, maakRealtimeAdapter } from './adapter.js'
-import { COLLECTIE } from './collectie.js'
 import { zetPdokFixture } from './pdok.js'
 import KavelStap from './KavelStap.jsx'
+import SmaakStap from './SmaakStap.jsx'
 
 // De klantreis (/reis): een begeleide reis in stappen met de pratende
 // Architect als gastheer. Stem en tekst zijn hetzelfde gesprek via twee
@@ -40,90 +40,6 @@ function Voortgang({ stap }) {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-// Stap 1: de conceptcollectie met favorieten en het smaakprofiel. De
-// kaarten gebruiken exact dezelfde functielaag als de stem: klikken en
-// praten zijn hetzelfde gesprek.
-function CollectieStap({ sessie, functies, meldArchitect }) {
-  const [open, zetOpen] = useState(null)
-  const [citaten, zetCitaten] = useState({})
-  const [melding, zetMelding] = useState(null)
-  const favorieten = sessie.smaak.favorieten
-
-  async function toggleFavoriet(c) {
-    const aan = !favorieten.includes(c.nummer)
-    const r = await functies.voerUit('favorietKiezen', { nummer: c.nummer, aan })
-    if (!r.ok) zetMelding(r.fout)
-    else zetMelding(null)
-  }
-
-  async function bewaarCitaat(c) {
-    const tekst = (citaten[c.nummer] || '').trim()
-    if (!tekst) return
-    await functies.voerUit('smaakToevoegen', { favoriet: c.nummer, familie: c.familie, citaat: tekst })
-    zetCitaten(v => ({ ...v, [c.nummer]: '' }))
-    meldArchitect('Genoteerd bij ' + c.naam + ': "' + tekst + '"')
-  }
-
-  async function rondAf() {
-    const klaar = await functies.voerUit('stapAfronden', { stap: 1 })
-    if (!klaar.ok) { zetMelding(klaar.fout); return }
-    await functies.voerUit('naarStap', { stap: 2 })
-    meldArchitect('Mooi, uw smaakprofiel staat. Dan gaan we nu naar uw kavel en programma.')
-  }
-
-  return (
-    <div style={{ display: 'grid', gap: '.7rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.5rem' }}>
-        <span style={{ color: '#a7a49c', fontSize: '.88rem' }}>
-          Kies 3 tot 5 ontwerpen die u aanspreken ({favorieten.length} gekozen)
-        </span>
-        <button type="button" className="nieuweset" disabled={favorieten.length < 3 || favorieten.length > 5}
-          onClick={rondAf}>Smaak afronden</button>
-      </div>
-      {melding && <div style={{ ...vak, padding: '.5rem .8rem', color: '#d9b06a', fontSize: '.85rem' }}>{melding}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '.7rem' }}>
-        {COLLECTIE.map(c => {
-          const fav = favorieten.includes(c.nummer)
-          return (
-            <div key={c.nummer} className={'collectiekaart' + (fav ? ' favoriet' : '')} style={{
-              ...vak, overflow: 'hidden', cursor: 'pointer',
-              outline: fav ? '2px solid #e8873c' : 'none',
-            }}>
-              <img src={'./collectie/' + c.bestand.replace('.png', '.jpg')} alt={c.naam} loading="lazy"
-                onClick={() => toggleFavoriet(c)}
-                style={{ width: '100%', aspectRatio: '4 / 3', objectFit: 'cover', display: 'block' }} />
-              <div style={{ padding: '.55rem .7rem', display: 'grid', gap: '.3rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.4rem', alignItems: 'baseline' }}>
-                  <strong style={{ color: '#e8e4dc', letterSpacing: '.06em' }}>{c.naam}</strong>
-                  <span style={{ color: '#77756f', fontSize: '.72rem' }}>nr {c.nummer} · familie {c.familie}</span>
-                </div>
-                <span style={{ color: '#a7a49c', fontSize: '.76rem', lineHeight: 1.35 }}>{c.materialen}</span>
-                <button type="button" onClick={() => zetOpen(open === c.nummer ? null : c.nummer)}
-                  style={{ justifySelf: 'start', background: 'none', border: 'none', color: '#e8873c', cursor: 'pointer', padding: 0, fontSize: '.76rem' }}>
-                  {open === c.nummer ? 'minder' : 'meer over dit ontwerp'}
-                </button>
-                {open === c.nummer && (
-                  <p style={{ color: '#c9c5bc', fontSize: '.8rem', lineHeight: 1.45, margin: 0 }}>{c.beschrijving}</p>
-                )}
-                {fav && (
-                  <div style={{ display: 'flex', gap: '.4rem' }}>
-                    <input value={citaten[c.nummer] || ''} placeholder="Wat spreekt u hierin aan?"
-                      onChange={e => zetCitaten(v => ({ ...v, [c.nummer]: e.target.value }))}
-                      onKeyDown={e => { if (e.key === 'Enter') bewaarCitaat(c) }}
-                      style={{ flex: '1 1 120px', minWidth: 0, background: '#1c1c1f', color: '#e8e4dc', border: '1px solid #3a3a3e', borderRadius: 5, padding: '.35rem .5rem', fontSize: '.8rem' }} />
-                    <button type="button" className="nieuweset" style={{ padding: '.3rem .6rem', fontSize: '.75rem' }}
-                      onClick={() => bewaarCitaat(c)}>Noteer</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -262,7 +178,7 @@ export default function Reis() {
         <span className="titel">DE ARCHITECT <em>begeleide klantreis</em></span>
       </header>
 
-      <div style={{ maxWidth: 880, margin: '0 auto', padding: '1.1rem 1rem 2rem', display: 'grid', gap: '.9rem' }}>
+      <div style={{ maxWidth: stap === 1 ? 1280 : 880, margin: '0 auto', padding: '1.1rem 1rem 2rem', display: 'grid', gap: '.9rem' }}>
         <Voortgang stap={stap} />
 
         {melding && (
@@ -294,7 +210,7 @@ export default function Reis() {
         )}
 
         {stap === 1 && sessie && (
-          <CollectieStap sessie={sessie} functies={functiesRef.current} meldArchitect={t => toonBericht('architect', t)} />
+          <SmaakStap sessie={sessie} functies={functiesRef.current} meldArchitect={t => toonBericht('architect', t)} />
         )}
 
         {stap === 2 && sessie && (
