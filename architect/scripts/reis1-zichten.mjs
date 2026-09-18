@@ -30,7 +30,34 @@ const naamActief = () => page.evaluate(() => document.querySelector('.showslide.
 await page.goto(BASIS + '/reis')
   await voorbijStart(page)
 await page.waitForSelector('.podium', { timeout: 20000 })
-await page.click('text=Ik typ liever')
+
+// de nieuwe entree: geen kanaalkeuzescherm; de microfoon faalt hier
+// (headless), dus verschijnt exact de welkomsttekst als tekstbericht,
+// met het spraak-uit-signaal en een rustig doek in plaats van de show
+await page.waitForFunction(() => [...document.querySelectorAll('.beurt-architect')]
+  .some(b => b.textContent.includes('Welkom, ik ben de architect van STAEL')), null, { timeout: 15000 })
+const entree = await page.evaluate(() => ({
+  keuzescherm: document.body.textContent.includes('Ik typ liever') || document.body.textContent.includes('Praten is prima'),
+  welkomVolledig: [...document.querySelectorAll('.beurt-architect')]
+    .some(b => b.textContent.includes('Bent u er klaar voor om met de smaak te beginnen?')),
+  spraakUit: document.body.textContent.includes('spraak staat uit'),
+  rustdoek: !!document.querySelector('.rustdoek') && !document.querySelector('.smaakshow'),
+  invoer: !!document.querySelector('.invoerbalk input'),
+}))
+console.log('entree zonder kanaalkeuze:', !entree.keuzescherm ? 'ok' : 'FOUT (keuzescherm aanwezig)')
+console.log('welkomsttekst volledig als vangnet:', entree.welkomVolledig ? 'ok' : 'FOUT')
+console.log('spraak-uit-signaal en invoerbalk klaar:', entree.spraakUit && entree.invoer ? 'ok' : 'FOUT ' + JSON.stringify(entree))
+console.log('rustdoek: de show wacht op de bevestiging:', entree.rustdoek ? 'ok' : 'FOUT')
+
+// door naar stap 1 (de gespreksbevestiging zelf is gedragsregel van
+// het taalmodel en wordt in gesprekstest 0 gedekt)
+const startToken = new URL(page.url()).searchParams.get('s')
+await fetch(API + '/api/sessies/' + startToken, {
+  method: 'PATCH', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ stap: 1 }),
+})
+await page.reload()
+await voorbijStart(page)
 await page.waitForSelector('.smaakshow', { timeout: 20000 })
 await page.waitForSelector('.showslide.actief .naam', { timeout: 10000 })
 console.log('show geopend op:', await naamActief())
@@ -90,12 +117,17 @@ await page2.waitForFunction(() => document.body.textContent.includes('Wat is het
 console.log('hervatten op stap 2 met sessie intact: ok')
 
 // mobiel: show gestapeld, bladeren, geen horizontale overflow
+const maakMob = await fetch(API + '/api/sessies', { method: 'POST' })
+const { token: mobToken } = await maakMob.json()
+await fetch(API + '/api/sessies/' + mobToken, {
+  method: 'PATCH', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ stap: 1, spraakOk: false }),
+})
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 } })
 mob.on('pageerror', e => fouten.push('mobiel: ' + String(e)))
-await mob.goto(BASIS + '/reis')
+await mob.goto(BASIS + '/reis?s=' + mobToken)
   await voorbijStart(mob)
 await mob.waitForSelector('.podium', { timeout: 20000 })
-await mob.click('text=Ik typ liever')
 await mob.waitForSelector('.showslide.actief .naam', { timeout: 20000 })
 await mob.waitForTimeout(2400)
 await mob.click('.showknoppen button[aria-label="Volgende"]')
@@ -107,6 +139,25 @@ if (overflow > 0) console.log('breedste elementen:', await mob.evaluate(() => [.
 await mob.evaluate(() => document.querySelector('.smaakshow').scrollIntoView())
 await mob.waitForTimeout(1600)
 await mob.screenshot({ path: UIT + '/stap1-mobiel.png' })
+
+// een kale reload van een spraaksessie opent NOOIT vanzelf een
+// spraakverbinding: de knop Verder met uw ontwerpreis is de enige
+// interactie waarmee spraak mag starten
+const maakHervat = await fetch(API + '/api/sessies', { method: 'POST' })
+const { token: hervatToken } = await maakHervat.json()
+await fetch(API + '/api/sessies/' + hervatToken, {
+  method: 'PATCH', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ stap: 1, spraakOk: true }),
+})
+const stil = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+let stemAanvragen = 0
+stil.on('request', r => { if (r.url().includes('/api/stem/sessie')) stemAanvragen++ })
+await stil.goto(BASIS + '/reis?s=' + hervatToken)
+await stil.waitForSelector('.startknop', { timeout: 15000 })
+await stil.waitForTimeout(4000)
+console.log('kale reload start nooit vanzelf spraak:',
+  stemAanvragen === 0 ? 'ok (0 aanvragen zonder klik)' : 'FOUT (' + stemAanvragen + ' aanvragen)')
+await stil.close()
 
 console.log(fouten.length ? 'FOUTEN:\n' + fouten.slice(0, 6).join('\n') : 'console leeg')
 await browser.close()

@@ -46,7 +46,15 @@ await mock(page)
 await page.goto(BASIS + '/reis')
   await voorbijStart(page)
 await page.waitForSelector('.podium', { timeout: 20000 })
-await page.click('text=Ik typ liever')
+// de entree kent geen kanaalkeuze meer; door naar stap 1 via de
+// sessie (de gespreksbevestiging is in gesprekstest 0 gedekt)
+const startToken = new URL(page.url()).searchParams.get('s')
+await fetch(API + '/api/sessies/' + startToken, {
+  method: 'PATCH', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ stap: 1, spraakOk: false }),
+})
+await page.reload()
+await voorbijStart(page)
 
 // stap 1: drie favorieten met een citaat
 await page.waitForSelector('.showslide.actief .naam', { timeout: 20000 })

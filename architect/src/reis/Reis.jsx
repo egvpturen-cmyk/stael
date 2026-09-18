@@ -7,6 +7,23 @@ import KavelStap from './KavelStap.jsx'
 import SmaakStap from './SmaakStap.jsx'
 import ModellenStap from './ModellenStap.jsx'
 import StartScherm from './StartScherm.jsx'
+import { WELKOMSTTEKST } from './persoonlijkheid.js'
+import { startVonken } from './vonken.js'
+
+// tijdens het welkom staat het podium nog rustig: een donker doek met
+// lasvonken, zodat de collectieshow straks een opkomst heeft
+function RustDoek() {
+  const doek = useRef(null)
+  useEffect(() => startVonken(doek.current, null), [])
+  return (
+    <div className="rustdoek" style={{
+      position: 'relative', height: 'min(60vh, 560px)', overflow: 'hidden',
+      background: '#131315', border: '1px solid #2a2a2e', borderRadius: 10,
+    }}>
+      <canvas className="vonken" ref={doek} style={{ position: 'absolute', inset: 0, opacity: .85 }} />
+    </div>
+  )
+}
 
 // De klantreis (/reis): een begeleide reis in stappen met de pratende
 // Architect als gastheer. Stem en tekst zijn hetzelfde gesprek via twee
@@ -60,6 +77,7 @@ export default function Reis() {
   const [tekenVraag, zetTekenVraag] = useState(0)
   const [gesprekOpen, zetGesprekOpen] = useState(false)
   const [startWeg, zetStartWeg] = useState(false)
+  const [spraakUit, zetSpraakUit] = useState(false)
   const gesprekRef = useRef(null)
   const sessieRef = useRef({ huidige: null })
   const adapterRef = useRef(null)
@@ -118,9 +136,9 @@ export default function Reis() {
             zetSessie({ ...sessieRef.current.huidige })
           },
         })
-        toonBericht('architect', s.stap === 0
-          ? 'Welkom bij STAEL. Ik ben de Architect en ik neem u in vier stappen mee naar uw woning: eerst uw smaak, dan uw kavel en programma, dan de modellen, en tot slot de beelden. Vindt u het prettig om te praten, of typt u liever?'
-          : 'Welkom terug. We gaan verder waar we gebleven waren.')
+        // bij een verse reis komt het welkom pas na Ontmoet de
+        // architect (gesproken, of als tekstvangnet)
+        if (s.stap !== 0) toonBericht('architect', 'Welkom terug. We gaan verder waar we gebleven waren.')
       } catch (e) {
         zetMelding('De sessieopslag is even niet bereikbaar. Probeer het zo opnieuw.')
       }
@@ -156,7 +174,8 @@ export default function Reis() {
 
   async function startSpraak(sprekenBijStart = false) {
     try {
-      zetMelding(null)
+      // de klik is de interactie; de browser vraagt nu de microfoon
+      zetMelding('Uw browser vraagt toestemming voor de microfoon.')
       // nooit twee verbindingen of dubbele reserveringen: een lopende
       // adapter stopt (en rekent af) voordat de nieuwe start
       adapterRef.current?.stop?.()
@@ -167,13 +186,18 @@ export default function Reis() {
       }))
       zetStatus('spraak')
       await a.start()
+      zetMelding(null)
+      zetSpraakUit(false)
       await functiesRef.current.voerUit('spraakVoorkeur', { spraak: true })
+      return true
     } catch (e) {
       zetStatus('tekst')
       adapterRef.current = null
+      zetSpraakUit(true)
       zetMelding(e?.status === 429
         ? 'De spreektijd voor vandaag is op; we gaan gewoon verder via tekst.'
         : 'Spraak is nu niet beschikbaar (microfoon of dienst); we gaan verder via tekst.')
+      return false
     }
   }
 
@@ -185,18 +209,6 @@ export default function Reis() {
     try {
       await adapterRef.current.zegTekst(tekst)
     } catch { /* status-handler meldt al */ }
-  }
-
-  // stap 0 blijft ook zonder taalmodel volledig bedienbaar: dezelfde
-  // functies, maar dan via knoppen
-  async function kiesSpraakVoorkeur(spraak) {
-    if (spraak) { await startSpraak(); }
-    else await functiesRef.current.voerUit('spraakVoorkeur', { spraak: false })
-    await functiesRef.current.voerUit('stapAfronden', { stap: 0 })
-    await functiesRef.current.voerUit('naarStap', { stap: 1 })
-    toonBericht('architect', spraak
-      ? 'Prima, dan praten we. We beginnen met uw smaak.'
-      : 'Prima, dan typen we. We beginnen met uw smaak.')
   }
 
   function stopSpraak() {
@@ -211,13 +223,21 @@ export default function Reis() {
   // hernieuwde kennismaking
   const hervatten = !!sessie && (sessie.stap > 0 || sessie.spraakOk !== null)
 
-  // vanaf het startscherm: bij het ontmoeten start de stem en spreekt
-  // de Architect de welkomsttekst; lukt spraak niet, dan gaat de reis
-  // via tekst gewoon door (het podium houdt de keuzeknoppen)
+  // vanaf het startscherm: de knop IS de keuze; de spraakverbinding
+  // start direct en de Architect spreekt de welkomsttekst. Weigert de
+  // microfoon of faalt spraak, dan verschijnt exact dezelfde
+  // welkomsttekst als tekstbericht en gaat de reis via typen door.
   async function bijStart() {
     zetStartWeg(true)
-    if (!hervatten) await startSpraak(true)
-    else if (sessie?.spraakOk === true) await startSpraak(true)
+    if (!hervatten) {
+      const gelukt = await startSpraak(true)
+      if (!gelukt) {
+        await functiesRef.current.voerUit('spraakVoorkeur', { spraak: false })
+        toonBericht('architect', WELKOMSTTEKST)
+      }
+    } else if (sessie?.spraakOk === true) {
+      await startSpraak(true)
+    }
   }
 
   return (
@@ -236,18 +256,7 @@ export default function Reis() {
             <div style={{ ...vak, padding: '.6rem .8rem', color: '#d9b06a', fontSize: '.85rem', marginBottom: '.8rem' }}>{melding}</div>
           )}
 
-          {stap === 0 && sessie && (
-            <div className="ontvangst" style={{ ...vak, maxWidth: 560, margin: '8vh auto 0', padding: '1.4rem', display: 'grid', gap: '.9rem', justifyItems: 'start' }}>
-              <strong style={{ color: '#e8e4dc', letterSpacing: '.06em' }}>Welkom bij STÆL</strong>
-              <p style={{ color: '#a7a49c', margin: 0, lineHeight: 1.55, fontSize: '.9rem' }}>
-                De Architect neemt u in vier stappen mee naar uw woning: uw smaak, uw kavel en programma, de modellen en de beelden.
-              </p>
-              <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
-                <button type="button" className="nieuweset" onClick={() => kiesSpraakVoorkeur(true)}>Praten is prima</button>
-                <button type="button" className="nieuweset" onClick={() => kiesSpraakVoorkeur(false)}>Ik typ liever</button>
-              </div>
-            </div>
-          )}
+          {stap === 0 && sessie && startWeg && <RustDoek />}
 
           {stap === 1 && sessie && (
             <SmaakStap sessie={sessie} functies={functiesRef.current} meldArchitect={t => toonBericht('architect', t)} />
@@ -301,7 +310,12 @@ export default function Reis() {
             <button type="button" className="nieuweset invoerknop" onClick={verstuur}>Verstuur</button>
             {status === 'spraak'
               ? <button type="button" className="nieuweset invoerknop" onClick={stopSpraak} title="Stop het spraakgesprek">⏹ Stop</button>
-              : <button type="button" className="nieuweset invoerknop" onClick={() => startSpraak()} title="Start het spraakgesprek">🎙</button>}
+              : (
+                <button type="button" className="nieuweset invoerknop" onClick={() => startSpraak()}
+                  title="Zet spraak aan">
+                  🎙{spraakUit && <span className="spraakuit" style={{ marginLeft: '.35rem', fontSize: '.68rem', color: '#95928c' }}>spraak staat uit</span>}
+                </button>
+              )}
           </div>
           <p className="gesprekhint">
             Praten en typen zijn hetzelfde gesprek; u kunt altijd wisselen. Uw sessie is te hervatten via de link in de adresbalk.

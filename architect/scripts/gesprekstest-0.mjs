@@ -38,7 +38,22 @@ try {
   const apiP = await import('file://' + path.join(apiMap, 'persoonlijkheid.js').replace(/\\/g, '/'))
   eis('persoonlijkheid app en server identiek',
     appP.PERSOONLIJKHEID === apiP.PERSOONLIJKHEID
-    && JSON.stringify(appP.FUNCTIES) === JSON.stringify(apiP.FUNCTIES))
+    && JSON.stringify(appP.FUNCTIES) === JSON.stringify(apiP.FUNCTIES)
+    && appP.WELKOMSTTEKST === apiP.WELKOMSTTEKST)
+
+  // de entree: exact een welkomsttekst als verplichte eerste beurt,
+  // geen kanaalvraag, en stap 1 pas na een bevestigend antwoord
+  const P = appP.PERSOONLIJKHEID.replace(/\s+/g, ' ')
+  eis('de exacte welkomsttekst is de verplichte eerste beurt',
+    appP.WELKOMSTTEKST.startsWith('Welkom, ik ben de architect van STAEL.')
+    && appP.WELKOMSTTEKST.endsWith('Bent u er klaar voor om met de smaak te beginnen?')
+    && P.includes(appP.WELKOMSTTEKST)
+    && P.includes('woord voor woord'))
+  eis('de kanaalvraag praten of typen bestaat niet meer',
+    !P.includes('praten of') && !P.includes('typt u liever')
+    && P.includes('vraagt er nooit naar'))
+  eis('stap 1 opent volgens de regels pas na een bevestigend antwoord',
+    P.includes('PAS na een bevestigend antwoord') && P.includes('eerder nooit'))
 
   const { sessieMaak, sessieLees } = await import('../src/reis/api.js')
   const { maakFuncties } = await import('../src/reis/functies.js')
@@ -49,15 +64,18 @@ try {
   const signalen = []
   const functies = maakFuncties({ token, sessieRef, opUiSignaal: (n, d) => signalen.push(n) })
 
+  // spraak lukt niet (het vangnet): de app legt de voorkeur vast en
+  // de exacte welkomsttekst verschijnt als tekstbericht
+  await functies.voerUit('spraakVoorkeur', { spraak: false })
+
   const ondertitels = []
   const adapter = maakTestAdapter({
     script: [
-      [{ zeg: 'Welkom bij STAEL, ik ben de Architect. We doorlopen vier stappen: smaak, kavel en programma, modellen en beelden. Vindt u het prettig om te praten, of typt u liever?' }],
+      [{ zeg: appP.WELKOMSTTEKST }],
       [
-        { functie: { naam: 'spraakVoorkeur', args: { spraak: false } } },
-        { zeg: 'Prima, dan typen we. Zullen we beginnen met uw smaak?' },
         { functie: { naam: 'stapAfronden', args: { stap: 0 } } },
         { functie: { naam: 'naarStap', args: { stap: 1 } } },
+        { zeg: 'Mooi, dan beginnen we met uw smaak.' },
       ],
     ],
   })
@@ -66,14 +84,14 @@ try {
   await adapter.start()
 
   await adapter.zegTekst('hallo')
-  eis('de Architect stelt zich voor en vraagt naar spraak',
-    ondertitels.length === 1 && ondertitels[0].includes('vier stappen'))
-  eis('na de begroeting is nog niets aan de sessie veranderd',
-    sessieRef.huidige.stap === 0 && sessieRef.huidige.spraakOk === null)
+  eis('de allereerste beurt is exact de welkomsttekst, volledig',
+    ondertitels.length === 1 && ondertitels[0] === appP.WELKOMSTTEKST)
+  eis('tijdens het welkom blijft de reis op stap 0 (de show wacht op de opkomst)',
+    sessieRef.huidige.stap === 0)
 
-  await adapter.zegTekst('ik typ liever')
+  await adapter.zegTekst('ja, ik ben er klaar voor')
   eis('spraakvoorkeur staat vastgelegd als tekst', sessieRef.huidige.spraakOk === false)
-  eis('de reis staat op stap 1', sessieRef.huidige.stap === 1)
+  eis('pas na de bevestiging staat de reis op stap 1', sessieRef.huidige.stap === 1)
   eis('ui-signalen kwamen door (voorkeur, afronden, stap)',
     signalen.includes('spraakVoorkeur') && signalen.includes('stapAfgerond') && signalen.includes('stap'))
 
