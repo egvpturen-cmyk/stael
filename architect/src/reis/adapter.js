@@ -14,7 +14,7 @@
 //   a.stop()
 import { PERSOONLIJKHEID, FUNCTIES } from './persoonlijkheid.js'
 import { collectieContext } from './collectie.js'
-import { stemSessie, stemTekst } from './api.js'
+import { stemSessie, stemTekst, stemHartslag, stemEinde } from './api.js'
 
 const SYSTEEM = PERSOONLIJKHEID + '\n\n' + collectieContext()
 
@@ -156,6 +156,7 @@ export function maakEventVerwerker({ stuur, rm, onTranscript, onFunctionCall }) 
 export function maakRealtimeAdapter({ token, stemOverride, sprekenBijStart }) {
   const a = basis()
   let pc = null, dc = null, micStroom = null, audioEl = null, klok = null
+  let uitgifteId = null, hartslagKlok = null
 
   const stuur = obj => { if (dc && dc.readyState === 'open') dc.send(JSON.stringify(obj)) }
   const rm = maakResponseManager(stuur)
@@ -217,6 +218,12 @@ export function maakRealtimeAdapter({ token, stemOverride, sprekenBijStart }) {
     await pc.setRemoteDescription({ type: 'answer', sdp: await sdpAntwoord.text() })
     // kostenrem aan de clientkant: na de maximale duur netjes stoppen
     klok = setTimeout(() => { a.stop(); a.onStatus('fout:tijd:maximale gespreksduur bereikt') }, s.maxMinuten * 60000)
+    // eerlijke telling: hartslag zolang de verbinding leeft, afrekenen
+    // op de werkelijke duur bij het stoppen
+    uitgifteId = s.uitgifteId || null
+    if (uitgifteId) {
+      hartslagKlok = setInterval(() => { stemHartslag(uitgifteId).catch(() => {}) }, 60000)
+    }
   }
 
   a.zegTekst = async tekst => {
@@ -226,6 +233,8 @@ export function maakRealtimeAdapter({ token, stemOverride, sprekenBijStart }) {
 
   a.stop = () => {
     if (klok) clearTimeout(klok)
+    if (hartslagKlok) clearInterval(hartslagKlok)
+    if (uitgifteId) { stemEinde(uitgifteId).catch(() => {}); uitgifteId = null }
     if (micStroom) micStroom.getTracks().forEach(sp => sp.stop())
     if (dc) try { dc.close() } catch { /* al dicht */ }
     if (pc) try { pc.close() } catch { /* al dicht */ }

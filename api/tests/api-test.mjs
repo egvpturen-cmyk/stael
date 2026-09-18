@@ -16,6 +16,7 @@ const server = spawn(process.execPath, ['server.js'], {
   env: {
     ...process.env, PORT: String(POORT), OPSLAG_PAD: tmp,
     STEM_TEST_MODUS: '1', STEM_MAX_SESSIE_MIN: '20', STEM_DAG_PLAFOND_MIN: '60',
+    STEM_HARTSLAG_VERLOOP_MS: '400',
     DATABASE_URL: '', OPENAI_API_KEY: '',
   },
   stdio: 'ignore',
@@ -75,7 +76,9 @@ try {
   r = await fetch(BASIS + '/api/sessies/bestaatniet')
   eis('onbekend token geeft 404', r.status === 404)
 
-  // 5. kostenrem: 20 min per sessie, plafond 60 = drie tokens, dan 429
+  // 5. kostenrem: 20 min reserveren per start, plafond 60 = drie
+  // gelijktijdige reserveringen, dan hard 429
+  const uitgiften = []
   for (let i = 1; i <= 3; i++) {
     r = await fetch(BASIS + '/api/stem/sessie', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -83,20 +86,71 @@ try {
     })
     const d = await r.json()
     eis('stemtoken ' + i + ' binnen het plafond (200, maxMinuten 20)',
-      r.status === 200 && d.maxMinuten === 20 && typeof d.clientSecret === 'string')
+      r.status === 200 && d.maxMinuten === 20 && typeof d.clientSecret === 'string' && typeof d.uitgifteId === 'string')
+    uitgiften.push(d.uitgifteId)
   }
   r = await fetch(BASIS + '/api/stem/sessie', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessieToken: token }),
   })
   const rem = await r.json()
-  eis('vierde stemtoken raakt het dagplafond (429 met advies tekst)',
-    r.status === 429 && rem.advies === 'schakel over op tekst' && rem.verbruiktMin === 60)
+  eis('vierde stemtoken raakt het dagplafond hard (429 met advies tekst)',
+    r.status === 429 && rem.advies === 'schakel over op tekst'
+    && rem.verbruiktMin + rem.gereserveerdMin === 60)
   r = await fetch(BASIS + '/api/stem/sessie', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessieToken: 'bestaatniet' }),
   })
   eis('stemtoken voor onbekende sessie geeft 404', r.status === 404)
+
+  // 6. eerlijke telling: reserveren bij start, afrekenen op werkelijke
+  // duur, restant terug, wegval via de hartslag
+  const stand = async () => (await (await fetch(BASIS + '/api/stem/stand')).json())
+  let s1 = await stand()
+  eis('een start reserveert precies een keer (stand toont drie uitgiften)',
+    s1.uitgiftenVandaag === 3 && s1.gereserveerdNuMin === 60 && s1.verbruiktVandaagMin === 0
+    && s1.plafondMin === 60)
+
+  // kort starten en stoppen: afrekenen op 1 minuut, restant terug
+  for (const id of uitgiften.slice(0, 2)) {
+    r = await fetch(BASIS + '/api/stem/einde', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uitgifteId: id }),
+    })
+    const d = await r.json()
+    eis('kort stoppen rekent af op de werkelijke duur (1 min)', r.status === 200 && d.verbruiktMin === 1)
+  }
+  const s2 = await stand()
+  eis('het restant is aantoonbaar terug (verbruikt 2, gereserveerd 20)',
+    s2.verbruiktVandaagMin === 2 && s2.gereserveerdNuMin === 20)
+  r = await fetch(BASIS + '/api/stem/sessie', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessieToken: token }),
+  })
+  eis('na teruggave past er weer een nieuwe start binnen het plafond', r.status === 200)
+
+  // dubbel einde is onschadelijk (idempotent)
+  r = await fetch(BASIS + '/api/stem/einde', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uitgifteId: uitgiften[0] }),
+  })
+  eis('nogmaals beeindigen telt niet dubbel', (await r.json()).verbruiktMin === 1
+    && (await stand()).verbruiktVandaagMin === 2)
+
+  // wegval: geen hartslag meer, dan verloopt de uitgifte vanzelf en
+  // wordt hij afgerekend op de laatst geziene hartslag
+  await fetch(BASIS + '/api/stem/hartslag', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uitgifteId: uitgiften[2] }),
+  })
+  await new Promise(rr => setTimeout(rr, 700))
+  const s3 = await stand()
+  eis('weggevallen verbindingen verlopen via de hartslag en geven hun reservering vrij',
+    s3.gereserveerdNuMin === 0 && s3.verbruiktVandaagMin === 4 && s3.uitgiftenVandaag === 4,
+    JSON.stringify(s3))
+  eis('onbekende hartslag en einde geven 404',
+    (await fetch(BASIS + '/api/stem/hartslag', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uitgifteId: 'nep' }) })).status === 404
+    && (await fetch(BASIS + '/api/stem/einde', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uitgifteId: 'nep' }) })).status === 404)
 } finally {
   console.log(fouten ? 'FAAL: ' + fouten + ' tests rood' : 'alle API-tests groen')
   fs.rmSync(tmp, { recursive: true, force: true })

@@ -157,6 +157,10 @@ export default function Reis() {
   async function startSpraak(sprekenBijStart = false) {
     try {
       zetMelding(null)
+      // nooit twee verbindingen of dubbele reserveringen: een lopende
+      // adapter stopt (en rekent af) voordat de nieuwe start
+      adapterRef.current?.stop?.()
+      adapterRef.current = null
       const url = new URL(location.href)
       const a = koppelAdapter(maakRealtimeAdapter({
         token, stemOverride: url.searchParams.get('stem') || undefined, sprekenBijStart,

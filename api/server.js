@@ -8,7 +8,9 @@
 //   STEM_MAX_SESSIE_MIN     maximale gespreksduur per sessie (default 20)
 //   STEM_DAG_PLAFOND_MIN    dagplafond over alle sessies (default 60)
 //   STEM_MODEL              Realtime-model (default gpt-realtime)
-//   STEM_STEM               stemnaam (default marin)
+//   STEM_STEM               stemnaam (default ash)
+//   STEM_HARTSLAG_VERLOOP_MS na deze stilte geldt een verbinding als
+//                           weggevallen en rekent hij af (default 180000)
 //   CORS_ORIGINS            kommagescheiden origins (default *)
 //   STEM_TEST_MODUS         1 = dummy-token zonder OpenAI-call (tests)
 import express from 'express'
@@ -118,20 +120,23 @@ app.post('/api/stem/sessie', async (req, res) => {
   if (!sessieStand) {
     return res.status(404).json({ fout: 'onbekende sessie' })
   }
+  // eerlijke telling: afgerekend verbruik plus actieve reserveringen
+  // (verlopen verbindingen zijn dan al via de hartslag afgerekend)
+  const gereserveerd = await opslag.ruimOpEnReserveerd()
   const verbruikt = await opslag.verbruikVandaag()
-  if (verbruikt + MAX_SESSIE_MIN > DAG_PLAFOND_MIN) {
+  if (verbruikt + gereserveerd + MAX_SESSIE_MIN > DAG_PLAFOND_MIN) {
     return res.status(429).json({
-      fout: 'dagplafond bereikt', verbruiktMin: verbruikt, plafondMin: DAG_PLAFOND_MIN,
-      advies: 'schakel over op tekst',
+      fout: 'dagplafond bereikt', verbruiktMin: verbruikt, gereserveerdMin: gereserveerd,
+      plafondMin: DAG_PLAFOND_MIN, advies: 'schakel over op tekst',
     })
   }
   const model = process.env.STEM_MODEL || 'gpt-realtime'
-  const stem = process.env.STEM_STEM || 'marin'
+  const stem = process.env.STEM_STEM || 'ash'
 
   if (process.env.STEM_TEST_MODUS === '1') {
-    await opslag.verbruikTel(MAX_SESSIE_MIN)
+    const { id } = await opslag.uitgifteMaak({ sessieToken, gereserveerdMin: MAX_SESSIE_MIN })
     return res.json({
-      clientSecret: 'test-' + nieuwToken(), verlooptOm: null,
+      clientSecret: 'test-' + nieuwToken(), verlooptOm: null, uitgifteId: id,
       maxMinuten: MAX_SESSIE_MIN, model, stem, testModus: true,
     })
   }
@@ -176,15 +181,48 @@ app.post('/api/stem/sessie', async (req, res) => {
     if (!secret) {
       return res.status(502).json({ fout: 'kon geen sessietoken maken', detail: data?.error?.message || null })
     }
-    await opslag.verbruikTel(MAX_SESSIE_MIN)
+    const { id } = await opslag.uitgifteMaak({ sessieToken, gereserveerdMin: MAX_SESSIE_MIN })
     res.json({
-      clientSecret: secret,
+      clientSecret: secret, uitgifteId: id,
       verlooptOm: data?.expires_at || data?.client_secret?.expires_at || null,
       maxMinuten: MAX_SESSIE_MIN, model, stem,
     })
   } catch (e) {
     res.status(502).json({ fout: 'stemdienst onbereikbaar', detail: String(e.message || e) })
   }
+})
+
+// hartslag: de client meldt periodiek dat de verbinding nog leeft; een
+// weggevallen verbinding verloopt zo vanzelf op de laatste hartslag
+app.post('/api/stem/hartslag', async (req, res) => {
+  const ok = req.body?.uitgifteId ? await opslag.uitgifteHartslag(req.body.uitgifteId) : false
+  if (!ok) return res.status(404).json({ fout: 'onbekende uitgifte' })
+  res.json({ ok: true })
+})
+
+// einde: afrekenen op de werkelijke duur; het restant van de
+// reservering gaat terug naar het dagplafond
+app.post('/api/stem/einde', async (req, res) => {
+  const uit = req.body?.uitgifteId ? await opslag.uitgifteEinde(req.body.uitgifteId) : null
+  if (!uit) return res.status(404).json({ fout: 'onbekende uitgifte' })
+  res.json({ ok: true, verbruiktMin: uit.verbruiktMin })
+})
+
+// de stand van de kostenrem, simpel afleesbaar
+app.get('/api/stem/stand', async (req, res) => {
+  const gereserveerd = await opslag.ruimOpEnReserveerd()
+  const verbruikt = await opslag.verbruikVandaag()
+  const uitgiften = await opslag.uitgiftenVandaag()
+  res.json({
+    verbruiktVandaagMin: verbruikt,
+    gereserveerdNuMin: gereserveerd,
+    plafondMin: DAG_PLAFOND_MIN,
+    uitgiftenVandaag: uitgiften.length,
+    uitgiften: uitgiften.map(u => ({
+      startOm: u.startOm, gereserveerdMin: u.gereserveerdMin,
+      verbruiktMin: u.verbruiktMin, actief: u.verbruiktMin == null,
+    })),
+  })
 })
 
 // tekstkanaal: hetzelfde gesprek als de stem, via chat completions.

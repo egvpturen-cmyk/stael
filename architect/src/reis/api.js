@@ -31,3 +31,9 @@ export const stemSessie = sessieToken => vraag('/api/stem/sessie', {
 export const stemTekst = (sessieToken, berichten) => vraag('/api/stem/tekst', {
   method: 'POST', body: JSON.stringify({ sessieToken, berichten }),
 })
+export const stemHartslag = uitgifteId => vraag('/api/stem/hartslag', {
+  method: 'POST', body: JSON.stringify({ uitgifteId }),
+})
+export const stemEinde = uitgifteId => vraag('/api/stem/einde', {
+  method: 'POST', body: JSON.stringify({ uitgifteId }),
+})
