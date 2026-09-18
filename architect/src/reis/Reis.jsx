@@ -66,7 +66,14 @@ export default function Reis() {
   const functiesRef = useRef(null)
   const onderaan = useRef(null)
 
+  const laatsteKlantRef = useRef(null)
   const toonBericht = (rol, tekst, definitief = true) => {
+    // vangnet: dezelfde klantbeurt landt nooit twee keer in het gesprek
+    if (rol === 'klant' && definitief) {
+      const vorige = laatsteKlantRef.current
+      if (vorige && vorige.tekst === tekst && Date.now() - vorige.om < 2500) return
+      laatsteKlantRef.current = { tekst, om: Date.now() }
+    }
     zetBerichten(b => {
       const kopie = [...b]
       const laatste = kopie[kopie.length - 1]
