@@ -176,13 +176,13 @@ async function doorloop(page, naam, { volledig }) {
     await page.waitForTimeout(400)
     await page.screenshot({ path: UIT + '/stap2-' + naam + '-programma.png' })
     await page.click('text=Kavel en programma afronden')
-    await page.waitForFunction(() => document.body.textContent.includes('Stap 3 (Modellen)'), { timeout: 15000 })
-    console.log(naam + ' afronden met ingetekende kavel brengt de reis naar stap 3: ok')
+    await page.waitForFunction(() => document.body.textContent.includes('Nieuwe varianten'), { timeout: 15000 })
+    console.log(naam + ' afronden met ingetekende kavel brengt de reis naar stap 3 (modellenstap zichtbaar): ok')
 
     const page2 = await browser.newPage({ viewport: page.viewportSize() })
     await mock(page2)
     await page2.goto(BASIS + '/reis?s=' + token)
-    await page2.waitForFunction(() => document.body.textContent.includes('Stap 3 (Modellen)'), { timeout: 20000 })
+    await page2.waitForFunction(() => document.body.textContent.includes('Nieuwe varianten'), { timeout: 20000 })
     console.log(naam + ' hervatten op stap 3 met sessie intact: ok')
     await page2.close()
   } else {

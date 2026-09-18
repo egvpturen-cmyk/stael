@@ -6,6 +6,23 @@
 import { sessiePatch } from './api.js'
 import { COLLECTIE } from './collectie.js'
 import { zoekAdres, adresDetail, percelenRond, puntInPerceel, MOEDERPERCEEL_M2 } from './pdok.js'
+import { genereerSmaakSet, variantVoorSessie } from './smaakmotor.js'
+import { bouwModel } from '../kern/model.js'
+import { valideerModel, repareerModel } from '../kern/valideer.js'
+import { MATERIALEN } from '../kern/materialen.js'
+
+// welke ontwerpparameters het aanpasgesprek mag wijzigen, met grenzen;
+// alles gaat daarna alsnog door bouwModel, valideerModel en het
+// bouwvlak, dus dit is de eerste poort, niet de enige
+const WIJZIGBAAR = {
+  'volume.goot': { naam: 'goothoogte', eenheid: 'm', min: 2.4, max: p => p.regels?.gootMax ?? 7 },
+  'volume.helling': { naam: 'dakhelling', eenheid: 'graden', min: 15, max: p => p.regels?.hellingMax ?? 60, nietPlat: true },
+  'volume.b': { naam: 'breedte', eenheid: 'm', min: 3, max: 12 },
+  'volume.d': { naam: 'diepte', eenheid: 'm', min: 4, max: 30 },
+  'materialen.gevel': { naam: 'gevelmateriaal', cat: 'gevel' },
+  'materialen.dak': { naam: 'dakmateriaal', cat: 'dak' },
+  'materialen.accent': { naam: 'accentmateriaal', cat: 'accent' },
+}
 
 // vlakke oppervlakte van een lon/lat-ring in m2 (schoenveterformule op
 // een lokale meterprojectie); ruim nauwkeurig genoeg voor woonkavels
@@ -25,7 +42,7 @@ export function ringOppervlakteM2(punten) {
 // stappen die in de app echt gebouwd zijn; de resultaten van naarStap
 // en stapAfronden melden dit, en de Architect belooft alleen wat hier
 // bevestigd wordt (nooit een stap die nog moet komen)
-export const GEBOUWDE_STAPPEN = [0, 1, 2]
+export const GEBOUWDE_STAPPEN = [0, 1, 2, 3]
 
 export function maakFuncties({ token, sessieRef, opUiSignaal }) {
   const sessie = () => sessieRef.huidige
@@ -246,6 +263,9 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
           return { ok: false, fout: 'leg eerst het programma vast (minstens woonoppervlakte en slaapkamers)' }
         }
       }
+      if (stap === 3 && !sessie().model?.gekozenId) {
+        return { ok: false, fout: 'kies eerst een variant als uitgangspunt' }
+      }
       signaal('stapAfgerond', { stap })
       const volgendeBeschikbaar = GEBOUWDE_STAPPEN.includes(stap + 1)
       return {
@@ -265,13 +285,108 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
       }
     },
 
-    // parameterWijzigen en setVerversen krijgen hun echte uitvoering in
-    // onderdeel E (stap 3); tot die tijd melden ze eerlijk hun grens
-    async parameterWijzigen() {
-      return { ok: false, fout: 'aanpassen kan pas in stap 3 (modellen)' }
-    },
+    // stap 3: een nieuwe set van vijf varianten, gestuurd door het
+    // smaakprofiel, het programma en de kavel; een gekozen favoriet
+    // blijft staan
     async setVerversen() {
-      return { ok: false, fout: 'nieuwe sets kunnen pas in stap 3 (modellen)' }
+      const s = sessie()
+      const oud = s.model || {}
+      const ronde = (oud.ronde ?? -1) + 1
+      const behoud = oud.gekozenId ? (oud.varianten || []).find(v => v.id === oud.gekozenId) : null
+      const { prog, varianten } = await genereerSmaakSet({
+        smaak: s.smaak, programma: s.programma, kavel: s.kavel, ronde, behoud,
+      })
+      if (!varianten.length) return { ok: false, fout: 'er kwam geen variant door de bouwregels; pas het programma aan' }
+      const bewaard = varianten.map(variantVoorSessie)
+      const alle = behoud ? [behoud, ...bewaard] : bewaard
+      const model = { prog, ronde, varianten: alle, gekozenId: oud.gekozenId || null, wijzigingen: oud.wijzigingen || [] }
+      await zet({ model })
+      signaal('model', model)
+      return {
+        ok: true, ronde,
+        varianten: alle.map(v => ({ id: v.id, naam: v.naam, smaakZin: v.smaakZin, oppervlakte: v.opp, past: v.past })),
+      }
+    },
+
+    async variantKiezen({ variantId }) {
+      const m = sessie().model
+      const v = (m?.varianten || []).find(x => x.id === String(variantId))
+      if (!v) return { ok: false, fout: 'onbekende variant; noem een id uit de huidige set' }
+      const model = { ...m, gekozenId: v.id }
+      await zet({ model })
+      signaal('model', model)
+      return { ok: true, gekozen: { id: v.id, naam: v.naam, smaakZin: v.smaakZin } }
+    },
+
+    // het aanpasgesprek: elke wens wordt een parameterwijziging die
+    // door de wetten en het bouwvlak gaat; wat niet kan, wordt eerlijk
+    // geweigerd met de reden
+    async parameterWijzigen({ pad, waarde }) {
+      const m = sessie().model
+      const gekozen = (m?.varianten || []).find(x => x.id === m?.gekozenId)
+      if (!gekozen) return { ok: false, fout: 'kies eerst een variant, dan kunnen we aanpassen' }
+      const regel = WIJZIGBAAR[pad]
+      if (!regel) {
+        return { ok: false, fout: 'dit is niet aan te passen; wel: ' + Object.entries(WIJZIGBAAR).map(([p, r]) => p + ' (' + r.naam + ')').join(', ') }
+      }
+      const params = structuredClone(gekozen.params)
+      if (regel.cat) {
+        const matId = typeof waarde === 'string' ? waarde : waarde?.mat
+        const def = MATERIALEN[matId]
+        if (!def || def.cat !== regel.cat) {
+          const keuzes = Object.entries(MATERIALEN).filter(([, d]) => d.cat === regel.cat).map(([id]) => id)
+          return { ok: false, fout: 'onbekend ' + regel.naam + '; kies uit: ' + keuzes.join(', ') }
+        }
+        const kleur = (typeof waarde === 'object' && waarde?.kleur && def.kleuren.some(k => k.id === waarde.kleur))
+          ? waarde.kleur : def.kleuren[0].id
+        const doel = pad.split('.')[1]
+        params.materialen[doel] = { mat: matId, kleur }
+        if (doel === 'accent') params.materialen.accent.forceer = true
+      } else {
+        const getal = Number(waarde)
+        if (!Number.isFinite(getal)) return { ok: false, fout: regel.naam + ' moet een getal zijn' }
+        const max = typeof regel.max === 'function' ? regel.max(m.prog) : regel.max
+        if (getal < regel.min || getal > max) {
+          return { ok: false, fout: regel.naam + ' moet tussen ' + regel.min + ' en ' + max + ' ' + regel.eenheid + ' liggen (bouwregels)' }
+        }
+        if (regel.nietPlat && params.volume.plat) {
+          return { ok: false, fout: 'dit model heeft een plat dak; een dakhelling is er niet' }
+        }
+        const [a, b] = pad.split('.')
+        params[a][b] = getal
+      }
+      // door het bouwvlak en de wetten; wat faalt, komt er niet in
+      const voet = params.volume.b * params.volume.d
+      if (voet > (m.prog?.bouwvlak || Infinity) + .5) {
+        return { ok: false, fout: 'dan wordt de voetafdruk ' + Math.round(voet) + ' m2 en dat past niet in het bouwvlak van ' + m.prog.bouwvlak + ' m2' }
+      }
+      let gebouwd, fouten
+      try {
+        gebouwd = bouwModel(params)
+        fouten = valideerModel(gebouwd)
+        if (fouten.length) { gebouwd = repareerModel(gebouwd); fouten = valideerModel(gebouwd) }
+      } catch (e) {
+        return { ok: false, fout: 'deze wijziging komt niet door de bouwregels (' + String(e.message || e) + ')' }
+      }
+      if (fouten.length) {
+        return { ok: false, fout: 'deze wijziging komt niet door de bouwregels: ' + fouten.slice(0, 2).join('; ') }
+      }
+      const nieuweVarianten = m.varianten.map(v => (v.id === gekozen.id ? {
+        ...v, params,
+        voet: Math.round(voet),
+        goot: Math.max(...gebouwd.volumes.map(x => x.goot)),
+        nok: Math.max(...gebouwd.volumes.map(x => x.nok)),
+        helling: Math.round(params.volume.helling || 0),
+      } : v))
+      const wijziging = { pad, waarde, om: new Date().toISOString() }
+      const model = { ...m, varianten: nieuweVarianten, wijzigingen: [...(m.wijzigingen || []), wijziging] }
+      await zet({ model })
+      signaal('model', model)
+      const na = nieuweVarianten.find(v => v.id === gekozen.id)
+      return {
+        ok: true, gewijzigd: regel.naam, waarde,
+        resultaat: { voet: na.voet, goot: Number(na.goot.toFixed(1)), nok: Number(na.nok.toFixed(1)) },
+      }
     },
   }
 

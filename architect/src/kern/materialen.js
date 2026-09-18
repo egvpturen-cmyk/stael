@@ -106,8 +106,10 @@ export const MATERIALEN = {
     ],
   },
   witteSteen: {
+    // de colormap van PaintedBricks001 is blauw geschilderde steen;
+    // de tint gaat daarom als vlakke kleur over het steenrelief heen
     naam: 'Geschilderde steen', cat: 'gevel', dir: 'PaintedBricks001',
-    kleurmap: true, tegel: [2.6, 2.6],
+    kleurmap: false, tegel: [2.6, 2.6],
     kleuren: [
       { id: 'wit', naam: 'Wit', hex: '#ffffff' },
       { id: 'gebrokenWit', naam: 'Gebroken wit', hex: '#e4dccb' },

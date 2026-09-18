@@ -84,6 +84,19 @@ bijzonderheid. Leg elk antwoord direct vast met programmaVastleggen.
 Vat samen, vraag of het klopt, en rond dan af met stapAfronden en
 naarStap naar stap 3. Afronden kan alleen met een gekozen perceel en
 een vastgelegd programma.
+
+In stap 3 (modellen): de app genereert met setVerversen vijf varianten
+uit het smaakprofiel, het programma en de kavel. Presenteer de set
+kort: benoem per variant in EEN zin de link met de smaakkeuzes; het
+resultaat levert die zin per variant mee (smaakZin), verzin er geen
+verbanden bij. Vraag welke variant de klant als uitgangspunt wil en
+leg dat vast met variantKiezen; setVerversen maakt een nieuwe set met
+behoud van die keuze. Daarna het aanpasgesprek: vertaal elke wens naar
+parameterWijzigen, benoem hardop wat je wijzigt en meld daarna het
+resultaat uit het functieresultaat (voetafdruk, goot, nok). Komt een
+wens niet door de bouwregels of het bouwvlak, dan weiger je eerlijk
+met de reden uit het resultaat en stel je een haalbaar alternatief
+voor. Afronden kan alleen met een gekozen variant.
 `.trim()
 
 // functiedeclaraties in het formaat dat zowel Realtime als chat
@@ -190,20 +203,29 @@ export const FUNCTIES = [
     },
   },
   {
+    name: 'variantKiezen',
+    description: 'Kies een variant uit de huidige set als uitgangspunt voor het aanpasgesprek (stap 3).',
+    parameters: {
+      type: 'object',
+      properties: { variantId: { type: 'string', description: 'id van de variant uit het setVerversen-resultaat' } },
+      required: ['variantId'],
+    },
+  },
+  {
     name: 'parameterWijzigen',
-    description: 'Wijzig een ontwerpparameter van het gekozen model (stap 3); de wijziging gaat door de bouwregels.',
+    description: 'Wijzig een ontwerpparameter van de gekozen variant (stap 3); de wijziging gaat door de bouwregels en het bouwvlak. Paden: volume.goot (m), volume.helling (graden), volume.b (breedte m), volume.d (diepte m), materialen.gevel, materialen.dak, materialen.accent (materiaal-id, eventueel {mat, kleur}).',
     parameters: {
       type: 'object',
       properties: {
-        pad: { type: 'string', description: 'parameterpad, bijv. volume.goot of materialen.dak.kleur' },
-        waarde: { description: 'nieuwe waarde' },
+        pad: { type: 'string', description: 'een van de genoemde parameterpaden' },
+        waarde: { description: 'nieuwe waarde: een getal voor maten, een materiaal-id of {mat, kleur} voor materialen' },
       },
       required: ['pad', 'waarde'],
     },
   },
   {
     name: 'setVerversen',
-    description: 'Genereer een nieuwe set varianten (stap 3), met behoud van de favoriet.',
+    description: 'Genereer een nieuwe set van vijf varianten uit smaakprofiel, programma en kavel (stap 3); een gekozen favoriet blijft staan.',
     parameters: { type: 'object', properties: {} },
   },
 ]

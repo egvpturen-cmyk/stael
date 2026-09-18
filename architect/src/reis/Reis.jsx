@@ -5,6 +5,7 @@ import { maakTekstAdapter, maakRealtimeAdapter } from './adapter.js'
 import { zetPdokFixture } from './pdok.js'
 import KavelStap from './KavelStap.jsx'
 import SmaakStap from './SmaakStap.jsx'
+import ModellenStap from './ModellenStap.jsx'
 
 // De klantreis (/reis): een begeleide reis in stappen met de pratende
 // Architect als gastheer. Stem en tekst zijn hetzelfde gesprek via twee
@@ -181,7 +182,7 @@ export default function Reis() {
         <span className="titel">DE ARCHITECT <em>begeleide klantreis</em></span>
       </header>
 
-      <div style={{ maxWidth: stap === 1 ? 1280 : 880, margin: '0 auto', padding: '1.1rem 1rem 2rem', display: 'grid', gap: '.9rem' }}>
+      <div style={{ maxWidth: stap === 1 || stap === 3 ? 1280 : 880, margin: '0 auto', padding: '1.1rem 1rem 2rem', display: 'grid', gap: '.9rem' }}>
         <Voortgang stap={stap} />
 
         {melding && (
@@ -221,7 +222,12 @@ export default function Reis() {
             tekenVraag={tekenVraag} meldArchitect={t => toonBericht('architect', t)} />
         )}
 
-        {stap > 2 && (
+        {stap === 3 && sessie && (
+          <ModellenStap sessie={sessie} functies={functiesRef.current}
+            meldArchitect={t => toonBericht('architect', t)} />
+        )}
+
+        {stap > 3 && (
           <div style={{ ...vak, padding: '.8rem', color: '#a7a49c', fontSize: '.88rem' }}>
             Stap {stap} ({STAPPEN[stap - 1]}) wordt in het volgende bouwdeel ingericht; het gesprek en uw sessie lopen gewoon door.
           </div>
