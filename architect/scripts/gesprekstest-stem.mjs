@@ -40,10 +40,10 @@ const eis = (naam, conditie, detail) => {
 // ---- dubbele beurten ----
 {
   const nu = Date.now()
-  eis('identieke beurt binnen korte tijd geldt als dubbel',
-    isDubbeleBeurt({ tekst: 'ja', om: nu - 400 }, 'ja', nu) === true)
-  eis('dezelfde tekst na ruime tijd is een echte nieuwe beurt',
-    isDubbeleBeurt({ tekst: 'ja', om: nu - 4000 }, 'ja', nu) === false)
+  eis('identieke beurt vrijwel gelijktijdig geldt als technisch duplicaat',
+    isDubbeleBeurt({ tekst: 'ja', om: nu - 200 }, 'ja', nu) === true)
+  eis('een bewuste herhaling (ruim een seconde later) is een echte beurt',
+    isDubbeleBeurt({ tekst: 'ja', om: nu - 1200 }, 'ja', nu) === false)
   eis('een andere tekst is nooit dubbel',
     isDubbeleBeurt({ tekst: 'ja', om: nu - 100 }, 'nee', nu) === false)
 }
@@ -90,6 +90,19 @@ const eis = (naam, conditie, detail) => {
   eis('de architecttekst rondt als een definitieve beurt af',
     transcripten.filter(t => t.startsWith('architect:')).length === 1
     && transcripten.includes('architect:Welkom bij STAEL.'))
+
+  // een onderbroken antwoord (cancel halverwege) laat geen half
+  // streamende ondertitel achter en de buffer plakt niet door
+  await verwerk({ type: 'response.created' })
+  await verwerk({ type: 'response.output_audio_transcript.delta', delta: 'Dan gaan we nu naar uw ' })
+  await verwerk({ type: 'response.cancelled' })
+  eis('een onderbroken antwoord rondt zijn ondertitel definitief af',
+    transcripten.includes('architect:Dan gaan we nu naar uw '))
+  await verwerk({ type: 'response.created' })
+  await verwerk({ type: 'response.output_audio_transcript.delta', delta: 'Goed, verder.' })
+  await verwerk({ type: 'response.output_audio_transcript.done', transcript: 'Goed, verder.' })
+  eis('de buffer van een onderbroken antwoord plakt niet aan het volgende',
+    transcripten.includes('architect:Goed, verder.'))
 }
 
 console.log(fouten ? 'FAAL: ' + fouten + ' checks rood' : 'gesprekstest stem groen')

@@ -85,9 +85,12 @@ export function maakResponseManager(stuur) {
   }
 }
 
-// dezelfde gebruikersbeurt mag nooit twee keer in het gesprek landen
-export function isDubbeleBeurt(vorige, tekst, nu = Date.now()) {
-  return !!vorige && vorige.tekst.trim() === (tekst || '').trim() && nu - vorige.om < 2500
+// dezelfde gebruikersbeurt mag nooit twee keer in het gesprek landen;
+// de drempel is krap, want technische duplicaten komen vrijwel
+// gelijktijdig binnen en een bewuste herhaling ("ja" ... "ja") is een
+// echte nieuwe beurt
+export function isDubbeleBeurt(vorige, tekst, nu = Date.now(), drempelMs = 600) {
+  return !!vorige && vorige.tekst.trim() === (tekst || '').trim() && nu - vorige.om < drempelMs
 }
 
 // de verwerking van Realtime-events, los van WebRTC zodat de
@@ -99,6 +102,12 @@ export function maakEventVerwerker({ stuur, rm, onTranscript, onFunctionCall }) 
   return async ev => {
     const t = ev.type || ''
     rm.event(t)
+    // een onderbroken of afgerond antwoord laat nooit een half
+    // "streamende" ondertitel achter: de buffer rondt dan af
+    if ((t === 'response.cancelled' || t === 'response.done' || t === 'response.failed') && architectBuffer) {
+      onTranscript('architect', architectBuffer, true)
+      architectBuffer = ''
+    }
     if (t.endsWith('audio_transcript.delta')) {
       architectBuffer += ev.delta || ''
       onTranscript('architect', architectBuffer, false)

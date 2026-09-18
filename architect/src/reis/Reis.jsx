@@ -68,18 +68,22 @@ export default function Reis() {
 
   const laatsteKlantRef = useRef(null)
   const toonBericht = (rol, tekst, definitief = true) => {
-    // vangnet: dezelfde klantbeurt landt nooit twee keer in het gesprek
+    // vangnet: een technisch duplicaat (vrijwel gelijktijdig, zelfde
+    // tekst) landt nooit twee keer; een bewuste herhaling wel
     if (rol === 'klant' && definitief) {
       const vorige = laatsteKlantRef.current
-      if (vorige && vorige.tekst === tekst && Date.now() - vorige.om < 2500) return
+      if (vorige && vorige.tekst === tekst && Date.now() - vorige.om < 600) return
       laatsteKlantRef.current = { tekst, om: Date.now() }
     }
     zetBerichten(b => {
-      const kopie = [...b]
+      let kopie = [...b]
       const laatste = kopie[kopie.length - 1]
       if (laatste && laatste.rol === rol && !laatste.definitief) {
         kopie[kopie.length - 1] = { rol, tekst, definitief }
       } else {
+        // er streamt nooit meer dan een bericht tegelijk: een nieuw
+        // bericht rondt eerst alles af wat nog open stond
+        kopie = kopie.map(x => (x.definitief ? x : { ...x, definitief: true }))
         kopie.push({ rol, tekst, definitief })
       }
       return kopie
