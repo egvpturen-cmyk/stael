@@ -52,6 +52,7 @@ export default function Reis() {
   const [status, zetStatus] = useState('tekst')
   const [melding, zetMelding] = useState(null)
   const [kavelBron, zetKavelBron] = useState(null)
+  const [tekenVraag, zetTekenVraag] = useState(0)
   const sessieRef = useRef({ huidige: null })
   const adapterRef = useRef(null)
   const functiesRef = useRef(null)
@@ -94,6 +95,7 @@ export default function Reis() {
           opUiSignaal: (naam, data) => {
             if (naam === 'kavelBron') { zetKavelBron(data); zetMelding(null) }
             if (naam === 'kavelFout') zetMelding('De percelen konden niet geladen worden; probeer het opnieuw.')
+            if (naam === 'tekenModus' && data?.aan) zetTekenVraag(v => v + 1)
             zetSessie({ ...sessieRef.current.huidige })
           },
         })
@@ -216,7 +218,7 @@ export default function Reis() {
 
         {stap === 2 && sessie && (
           <KavelStap sessie={sessie} functies={functiesRef.current} kavelBron={kavelBron}
-            meldArchitect={t => toonBericht('architect', t)} />
+            tekenVraag={tekenVraag} meldArchitect={t => toonBericht('architect', t)} />
         )}
 
         {stap > 2 && (

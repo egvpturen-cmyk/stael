@@ -64,9 +64,34 @@ export function normaliseerPercelen(featureCollection) {
     oppervlakte: f.properties.kadastraleGrootteWaarde,
     geometrie: f.geometry,
   })).filter(p => p.geometrie && Number.isFinite(p.oppervlakte))
+    // groot naar klein: kleine woonkavels komen zo boven de grote
+    // (wegen, plantsoenen) te liggen en blijven altijd aanklikbaar
+    .sort((a, b) => b.oppervlakte - a.oppervlakte)
 }
 
 export const ZOEKSTRAAL_M = 220
+
+// Percelen groter dan deze drempel zijn onwaarschijnlijk als woonkavel
+// en wijzen vaak op een moederperceel waarvan de kavelsplitsing nog
+// niet bij het Kadaster is ingeschreven. Instelbaar per omgeving.
+export let MOEDERPERCEEL_M2 = 5000
+export function zetMoederperceelDrempel(m2) { if (Number.isFinite(m2) && m2 > 0) MOEDERPERCEEL_M2 = m2 }
+
+// Ligt een punt (lon/lat) binnen het perceel? Gaten tellen mee.
+export function puntInPerceel(lon, lat, perceel) {
+  const inRing = ring => {
+    let b = false
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j]
+      if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) b = !b
+    }
+    return b
+  }
+  const g = perceel.geometrie || perceel.geometry
+  if (!g) return false
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates
+  return polys.some(poly => inRing(poly[0]) && !poly.slice(1).some(gat => inRing(gat)))
+}
 
 // Het zoekgebied rond een adres als Leaflet-bounds: binnen dit kader
 // is elk stuk kaart gedekt door de geladen percelen, dus hierop mag
@@ -83,11 +108,14 @@ export async function percelenRond(lon, lat, meters = ZOEKSTRAAL_M) {
   const dLat = meters / 111320
   const dLon = meters / (111320 * Math.cos(lat * Math.PI / 180))
   const bbox = [lat - dLat, lon - dLon, lat + dLat, lon + dLon].join(',') + ',urn:ogc:def:crs:EPSG::4326'
-  const url = PERCELEN_WFS + '?service=WFS&version=2.0.0&request=GetFeature'
+  // ruime count: bij een lagere limiet levert de WFS een willekeurige
+  // deelverzameling (en rapporteert numberMatched als het geleverde
+  // aantal), waardoor zelfs het perceel onder het adres kan ontbreken
+  const j = await haalJson(PERCELEN_WFS + '?service=WFS&version=2.0.0&request=GetFeature'
     + '&typeNames=kadastralekaart:Perceel&outputFormat=application/json'
-    + '&count=120&srsName=EPSG:4326&bbox=' + bbox
-  const j = await haalJson(url)
-  return { percelen: normaliseerPercelen(j) }
+    + '&count=1000&srsName=EPSG:4326&bbox=' + bbox)
+  const percelen = normaliseerPercelen(j)
+  return { percelen, mogelijkOnvolledig: (j.features || []).length >= 1000 }
 }
 
 // --- fixture-adres: het echte middelpunt bij de vastgelegde respons ---

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { LUCHTFOTO, pdokFixtureAan, zoekGebied } from './pdok.js'
+import { ringOppervlakteM2 } from './functies.js'
 
 // Stap 2: kavel en programma. De klant zoekt het adres, wijst het
 // eigen perceel aan op de luchtfoto met kadastrale grenzen, en legt
@@ -18,8 +19,14 @@ const veldStijl = {
 // luchtfoto (zand, kassen, wegmarkering) onmiskenbaar opvallen
 const STIJL_GEWOON = { color: '#C98A5E', weight: 2.5, fillColor: '#C98A5E', fillOpacity: 0.10 }
 const STIJL_GEKOZEN = { color: '#E8B48C', weight: 4, fillColor: '#E8B48C', fillOpacity: 0.30 }
+// het perceel waar de adresmarker in valt licht vast op, zodat de
+// klant al voor het klikken ziet welk vlak bij zijn adres hoort
+const STIJL_THUIS = { color: '#E8B48C', weight: 3, fillColor: '#E8B48C', fillOpacity: 0.22 }
+const STIJL_TEKENING = { color: '#E8B48C', weight: 3, dashArray: '6 4', fillColor: '#E8B48C', fillOpacity: 0.25 }
 
-export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }) {
+const hoekIcoon = L.divIcon({ className: 'tekenpunt', iconSize: [14, 14], iconAnchor: [7, 7] })
+
+export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, meldArchitect }) {
   const kaartDiv = useRef(null)
   const kaartRef = useRef(null)
   const perceelLaag = useRef(null)
@@ -27,6 +34,10 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
   const [zoeken, zetZoeken] = useState(false)
   const [melding, zetMelding] = useState(null)
   const [selectie, zetSelectie] = useState(null)
+  const [tekenen, zetTekenen] = useState(false)
+  const [tekenStand, zetTekenStand] = useState({ punten: 0, oppervlakte: 0 })
+  const tekenenRef = useRef(false)
+  const tekening = useRef({ markers: [], polygon: null })
   const kavel = sessie.kavel
   const programma = sessie.programma || {}
   const [form, zetForm] = useState({
@@ -66,6 +77,59 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
     meldArchitect('Uw programma staat genoteerd.')
   }
 
+  // ---- kavel zelf intekenen (moederperceel of deelaankoop) ----
+  const tekenPunten = () => tekening.current.markers.map(m => {
+    const ll = m.getLatLng(); return [ll.lng, ll.lat]
+  })
+
+  function updateTekening() {
+    const lonlat = tekenPunten()
+    const latlng = lonlat.map(([lon, lat]) => [lat, lon])
+    const t = tekening.current
+    if (t.polygon) { t.polygon.remove(); t.polygon = null }
+    if (latlng.length >= 2) {
+      t.polygon = L.polygon(latlng, { ...STIJL_TEKENING, interactive: false }).addTo(kaartRef.current)
+    }
+    zetTekenStand({ punten: lonlat.length, oppervlakte: Math.round(ringOppervlakteM2(lonlat)) })
+  }
+
+  function voegHoekpuntToe(latlng) {
+    const m = L.marker(latlng, { draggable: true, icon: hoekIcoon }).addTo(kaartRef.current)
+    m.on('drag', updateTekening)
+    m.on('dragend', updateTekening)
+    tekening.current.markers.push(m)
+    updateTekening()
+  }
+
+  function ruimTekeningOp() {
+    for (const m of tekening.current.markers) m.remove()
+    if (tekening.current.polygon) tekening.current.polygon.remove()
+    tekening.current = { markers: [], polygon: null }
+    tekenenRef.current = false
+    zetTekenen(false)
+    zetTekenStand({ punten: 0, oppervlakte: 0 })
+  }
+
+  function startTekenen() {
+    if (!kaartRef.current) { zetMelding('Zoek eerst het adres, dan kunt u de kavel intekenen.'); return }
+    ruimTekeningOp()
+    tekenenRef.current = true
+    zetTekenen(true)
+    zetSelectie(null)
+    zetMelding(null)
+  }
+
+  async function sluitTekening() {
+    const punten = tekenPunten()
+    const r = await functies.voerUit('kavelIntekenen', { punten })
+    if (!r.ok) { zetMelding(r.fout); return }
+    ruimTekeningOp()
+    meldArchitect('Uw kavel is ingetekend: ' + r.kavel.oppervlakte + ' m2 volgens uw eigen tekening. Dan nu uw woonwensen.')
+  }
+
+  // de Architect kan de tekenmodus starten (kavelTekenenStarten)
+  useEffect(() => { if (tekenVraag > 0) startTekenen() }, [tekenVraag])
+
   async function rondAf() {
     await legProgrammaVast()
     const klaar = await functies.voerUit('stapAfronden', { stap: 2 })
@@ -93,8 +157,13 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
       L.circleMarker([bron.adres.lat, bron.adres.lon], {
         radius: 6, color: '#e8873c', fillColor: '#e8873c', fillOpacity: 0.9, weight: 2, interactive: false,
       }).addTo(kaart)
-      // een klik naast alle percelen krijgt altijd een reactie
+      // in tekenmodus is elke kaartklik een hoekpunt; daarbuiten
+      // krijgt een klik naast alle percelen altijd een reactie
       kaart.on('click', e => {
+        if (tekenenRef.current) {
+          if (!(e.originalEvent && e.originalEvent._hoekpunt)) voegHoekpuntToe(e.latlng)
+          return
+        }
         if (e.originalEvent && e.originalEvent._opPerceel) return
         zetMelding('Hier vind ik geen perceel; klik binnen een koperen perceelgrens.')
       })
@@ -103,17 +172,21 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
 
     if (perceelLaag.current) perceelLaag.current.remove()
     const gekozenId = kavel?.perceelId
+    const thuisId = kavelBron?.thuisId ?? null
+    const stijlVoor = (id, selectieId) =>
+      id === selectieId ? STIJL_GEKOZEN : id === thuisId ? STIJL_THUIS : STIJL_GEWOON
     const laag = L.geoJSON(
       { type: 'FeatureCollection', features: bron.percelen.map(p => ({ type: 'Feature', properties: { id: p.id }, geometry: p.geometrie })) },
       {
-        style: f => (f.properties.id === gekozenId ? STIJL_GEKOZEN : STIJL_GEWOON),
+        style: f => stijlVoor(f.properties.id, gekozenId),
         onEachFeature: (f, layer) => {
           layer.on('click', e => {
             if (e.originalEvent) e.originalEvent._opPerceel = true
+            if (tekenenRef.current) return // de kaartklik-handler tekent het hoekpunt
             const p = bron.percelen.find(x => x.id === f.properties.id)
             zetSelectie(p || null)
             zetMelding(null)
-            laag.setStyle(g => (g.properties.id === f.properties.id ? STIJL_GEKOZEN : STIJL_GEWOON))
+            laag.setStyle(g => stijlVoor(g.properties.id, f.properties.id))
           })
         },
       },
@@ -146,7 +219,9 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
     <div style={{ display: 'grid', gap: '.7rem' }}>
       <div className="kavelzoek" style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ color: '#a7a49c', fontSize: '.88rem', flex: '1 1 100%' }}>
-          {kavel ? 'Uw kavel: ' + (kavel.adres || 'perceel ' + kavel.sectie + ' ' + kavel.perceelnummer) : 'Wat is het adres van uw kavel?'}
+          {kavel
+            ? 'Uw kavel: ' + (kavel.adres || (kavel.herkomst === 'zelf ingetekend' ? 'zelf ingetekend' : 'perceel ' + kavel.sectie + ' ' + kavel.perceelnummer))
+            : 'Wat is het adres van uw kavel?'}
         </span>
         <input value={adresInvoer} onChange={e => zetAdresInvoer(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') zoek() }}
@@ -166,19 +241,56 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
             position: 'relative', zIndex: 0,
             background: pdokFixtureAan() ? '#232a2e' : '#161618',
           }} />
-          {info && (
+          {tekenen && (
+            <div className="tekenpaneel" style={{ ...vak, padding: '.7rem .9rem', display: 'flex', gap: '.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'grid', gap: '.15rem', flex: '1 1 220px' }}>
+                <strong style={{ color: '#e8e4dc', letterSpacing: '.04em' }}>Kavel intekenen</strong>
+                <span style={{ color: '#a7a49c', fontSize: '.85rem' }}>
+                  Klik de hoekpunten op de kaart; punten zijn te verslepen.
+                  {' '}{tekenStand.punten} hoekpunt{tekenStand.punten === 1 ? '' : 'en'}
+                  {tekenStand.punten >= 3 && <> · oppervlakte: <b className="tekenopp" style={{ color: '#E8B48C' }}>{tekenStand.oppervlakte} m²</b></>}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                <button type="button" className="nieuweset" disabled={tekenStand.punten < 3}
+                  onClick={sluitTekening}>Vlak sluiten en gebruiken</button>
+                <button type="button" className="nieuweset" onClick={ruimTekeningOp}>Annuleren</button>
+              </div>
+            </div>
+          )}
+          {!tekenen && info && (
             <div className="perceelinfo" style={{ ...vak, padding: '.7rem .9rem', display: 'flex', gap: '.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ display: 'grid', gap: '.15rem', flex: '1 1 220px' }}>
-                <strong style={{ color: '#e8e4dc', letterSpacing: '.04em' }}>
-                  Perceel {info.gemeente} {info.sectie} {info.perceelnummer}
-                </strong>
-                <span style={{ color: '#a7a49c', fontSize: '.85rem' }}>
-                  Kadastrale oppervlakte: {info.oppervlakte} m² (uit de kadastrale gegevens)
-                </span>
+                {info.herkomst === 'zelf ingetekend' && !selectie ? (
+                  <>
+                    <strong style={{ color: '#e8e4dc', letterSpacing: '.04em' }}>Zelf ingetekende kavel</strong>
+                    <span style={{ color: '#a7a49c', fontSize: '.85rem' }}>
+                      Oppervlakte: {info.oppervlakte} m² (zelf ingetekend; het Kadaster kent deze kavel nog niet apart)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <strong style={{ color: '#e8e4dc', letterSpacing: '.04em' }}>
+                      Perceel {info.gemeente} {info.sectie} {info.perceelnummer}
+                    </strong>
+                    <span style={{ color: '#a7a49c', fontSize: '.85rem' }}>
+                      Kadastrale oppervlakte: {info.oppervlakte} m² (uit de kadastrale gegevens)
+                    </span>
+                  </>
+                )}
               </div>
               {!kavel || (selectie && selectie.id !== kavel.perceelId)
                 ? <button type="button" className="nieuweset" onClick={kiesPerceel} disabled={!selectie}>Dit is mijn perceel</button>
                 : <span style={{ color: '#8fc493', fontSize: '.85rem' }}>✓ gekozen</span>}
+            </div>
+          )}
+          {!tekenen && (
+            <div style={{ display: 'flex', gap: '.7rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ color: '#77756f', fontSize: '.78rem', flex: '1 1 260px' }}>
+                Staat uw kavel er niet als eigen perceel op (nieuwbouw) of koopt u een deel van een perceel?
+              </span>
+              <button type="button" className="nieuweset" style={{ padding: '.45rem 1rem', fontSize: '.78rem' }}
+                onClick={startTekenen}>Kavel zelf intekenen</button>
             </div>
           )}
         </div>

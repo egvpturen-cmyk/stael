@@ -60,11 +60,15 @@ async function doorloop(page, naam, { volledig }) {
   const percelen = await page.evaluate(() => document.querySelectorAll('.kavelkaart .leaflet-interactive').length)
   console.log(naam + ' perceelvlakken op de kaart:', percelen === WFS.features.length ? 'ok (' + percelen + ')' : 'ONVERWACHT ' + percelen)
 
-  // de grenzen zijn koperkleurig getekend, dus zichtbaar op luchtfoto
-  const koper = await page.evaluate(() =>
+  // de grenzen zijn koperkleurig getekend, dus zichtbaar op luchtfoto,
+  // en het perceel onder de adresmarker licht feller op
+  const kleuren = await page.evaluate(() =>
     [...document.querySelectorAll('.kavelkaart path.leaflet-interactive')]
-      .every(p => p.getAttribute('stroke')?.toLowerCase() === '#c98a5e'))
-  console.log(naam + ' perceelgrenzen in koper getekend:', koper ? 'ok' : 'NIET')
+      .map(p => p.getAttribute('stroke')?.toLowerCase()))
+  console.log(naam + ' perceelgrenzen in koper getekend:',
+    kleuren.every(k => k === '#c98a5e' || k === '#e8b48c') ? 'ok' : 'NIET')
+  console.log(naam + ' thuisperceel licht op voor het klikken:',
+    kleuren.filter(k => k === '#e8b48c').length === 1 ? 'ok' : 'NIET (' + kleuren.filter(k => k === '#e8b48c').length + ')')
   await page.waitForTimeout(600)
   await page.screenshot({ path: UIT + '/stap2-' + naam + '-kaart.png' })
 
@@ -99,7 +103,40 @@ async function doorloop(page, naam, { volledig }) {
   await page.click('text=Dit is mijn perceel')
   await page.waitForSelector('.programmaform', { timeout: 10000 })
 
+  // teken-interactie: hoekpunten klikken, oppervlakte live, verslepen
+  await page.click('text=Kavel zelf intekenen')
+  await page.waitForSelector('.tekenpaneel', { timeout: 8000 })
+  // de kaart in beeld zetten (op mobiel ligt hij na de gespreks-scroll
+  // onder de vouw) en pas meten als het beeld stilstaat
+  await page.waitForTimeout(800)
+  await page.evaluate(() => document.querySelector('.kavelkaart').scrollIntoView({ block: 'center' }))
+  await page.waitForTimeout(400)
+  const kaartBox = await page.locator('.kavelkaart').boundingBox()
+  const cx = kaartBox.x + kaartBox.width / 2, cy = kaartBox.y + kaartBox.height / 2
+  for (const [dx, dy] of [[-50, -40], [50, -40], [50, 40], [-50, 40]]) {
+    await page.mouse.click(cx + dx, cy + dy)
+    await page.waitForTimeout(250)
+  }
+  const opp1 = await page.evaluate(() => Number(document.querySelector('.tekenopp')?.textContent.replace(/\D/g, '')))
+  console.log(naam + ' oppervlakte live bij vier hoekpunten:', opp1 > 0 ? 'ok (' + opp1 + ' m2)' : 'NIET')
+  // een hoekpunt verslepen verandert de oppervlakte
+  const punt = await page.locator('.tekenpunt').last().boundingBox()
+  await page.mouse.move(punt.x + 7, punt.y + 7)
+  await page.mouse.down()
+  await page.mouse.move(punt.x - 33, punt.y + 7, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const opp2 = await page.evaluate(() => Number(document.querySelector('.tekenopp')?.textContent.replace(/\D/g, '')))
+  console.log(naam + ' verslepen verandert de oppervlakte:', opp2 > 0 && opp2 !== opp1 ? 'ok (' + opp1 + ' naar ' + opp2 + ')' : 'NIET (' + opp1 + '/' + opp2 + ')')
+  await page.screenshot({ path: UIT + '/stap2-' + naam + '-tekenen.png' })
+
   if (volledig) {
+    await page.click('text=Vlak sluiten en gebruiken')
+    await page.waitForFunction(() => document.body.textContent.includes('Zelf ingetekende kavel'), { timeout: 8000 })
+    const kv = (await (await fetch(API + '/api/sessies/' + token)).json()).sessie.kavel
+    console.log(naam + ' ingetekende kavel in sessie:',
+      kv?.herkomst === 'zelf ingetekend' && kv?.oppervlakte === opp2 ? 'ok (' + kv.oppervlakte + ' m2)' : 'ONVERWACHT ' + JSON.stringify({ herkomst: kv?.herkomst, opp: kv?.oppervlakte }))
+
     const velden = ['180', '2', '4', '2']
     const inputs = await page.$$('.programmaform input')
     for (let i = 0; i < velden.length; i++) await inputs[i].fill(velden[i])
@@ -109,7 +146,7 @@ async function doorloop(page, naam, { volledig }) {
     await page.screenshot({ path: UIT + '/stap2-' + naam + '-programma.png' })
     await page.click('text=Kavel en programma afronden')
     await page.waitForFunction(() => document.body.textContent.includes('Stap 3 (Modellen)'), { timeout: 15000 })
-    console.log(naam + ' afronden brengt de reis naar stap 3: ok')
+    console.log(naam + ' afronden met ingetekende kavel brengt de reis naar stap 3: ok')
 
     const page2 = await browser.newPage({ viewport: page.viewportSize() })
     await mock(page2)
@@ -118,6 +155,11 @@ async function doorloop(page, naam, { volledig }) {
     console.log(naam + ' hervatten op stap 3 met sessie intact: ok')
     await page2.close()
   } else {
+    // mobiel: annuleren ruimt de tekening op en het perceelpaneel keert terug
+    await page.click('text=Annuleren')
+    await page.waitForSelector('.perceelinfo', { timeout: 8000 })
+    const restPunten = await page.evaluate(() => document.querySelectorAll('.tekenpunt').length)
+    console.log(naam + ' annuleren ruimt de tekening op:', restPunten === 0 ? 'ok' : 'NIET (' + restPunten + ')')
     await page.waitForTimeout(400)
     await page.screenshot({ path: UIT + '/stap2-' + naam + '-programma.png' })
   }

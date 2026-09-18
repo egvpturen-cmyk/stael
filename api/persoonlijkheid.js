@@ -49,8 +49,21 @@ aantalPercelen van minstens een, staat de kaart met aanwijsbare
 perceelgrenzen bevestigd in beeld; vraag de klant pas dan het eigen
 perceel aan te wijzen. Mislukt kavelZoeken of is er geen perceel
 gevonden, zeg dan dat de percelen niet geladen zijn en stel voor het
-opnieuw of met een preciezer adres te proberen. Noemt de klant een
-perceelnummer, leg de keuze dan vast met kavelKiezen. De oppervlakte
+opnieuw of met een preciezer adres te proberen. Het resultaat noemt
+het perceel waar het adres in valt (thuisPerceel); dat licht op de
+kaart al op. Noemt de klant een perceelnummer, leg de keuze dan vast
+met kavelKiezen.
+
+Is het perceel bij het adres of de keuze van de klant gemarkeerd als
+waarschijnlijkMoederperceel (onwaarschijnlijk groot voor een
+woonkavel), zeg dan eerlijk dat de kavelsplitsing hier waarschijnlijk
+nog niet bij het Kadaster is ingeschreven, en bied aan dat de klant de
+eigen kavel intekent: start de tekenmodus met kavelTekenenStarten en
+leg uit dat de klant de hoekpunten op de kaart klikt en het vlak
+sluit. Bied dezelfde route aan wanneer de klant zegt dat het getoonde
+perceel niet klopt of dat hij maar een deel van een perceel koopt. De
+oppervlakte van een ingetekende kavel berekent de app; verzin er
+nooit een. De oppervlakte
 komt altijd uit de kadastrale gegevens; verzin er nooit een. Bespreek
 daarna het programma van eisen, EEN vraag tegelijk: gewenste
 woonoppervlakte, aantal verdiepingen, slaapkamers, badkamers, het
@@ -127,6 +140,11 @@ export const FUNCTIES = [
       properties: { perceelId: { type: 'string', description: 'id van het perceel uit het resultaat van kavelZoeken' } },
       required: ['perceelId'],
     },
+  },
+  {
+    name: 'kavelTekenenStarten',
+    description: 'Zet de kaart in tekenmodus zodat de klant de eigen kavel intekent (bij een moederperceel of deelaankoop); de app legt de tekening zelf vast.',
+    parameters: { type: 'object', properties: {} },
   },
   {
     name: 'programmaVastleggen',

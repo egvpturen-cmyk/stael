@@ -5,7 +5,22 @@
 // gesprekstest hem in node kan draaien.
 import { sessiePatch } from './api.js'
 import { COLLECTIE } from './collectie.js'
-import { zoekAdres, adresDetail, percelenRond } from './pdok.js'
+import { zoekAdres, adresDetail, percelenRond, puntInPerceel, MOEDERPERCEEL_M2 } from './pdok.js'
+
+// vlakke oppervlakte van een lon/lat-ring in m2 (schoenveterformule op
+// een lokale meterprojectie); ruim nauwkeurig genoeg voor woonkavels
+export function ringOppervlakteM2(punten) {
+  if (!punten || punten.length < 3) return 0
+  const R = 6378137, lat0 = punten[0][1] * Math.PI / 180
+  const x = p => p[0] * Math.PI / 180 * R * Math.cos(lat0)
+  const y = p => p[1] * Math.PI / 180 * R
+  let som = 0
+  for (let i = 0; i < punten.length; i++) {
+    const a = punten[i], b = punten[(i + 1) % punten.length]
+    som += x(a) * y(b) - x(b) * y(a)
+  }
+  return Math.abs(som / 2)
+}
 
 export function maakFuncties({ token, sessieRef, opUiSignaal }) {
   const sessie = () => sessieRef.huidige
@@ -78,18 +93,29 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
         signaal('kavelFout', { fout: 'geen percelen gevonden' })
         return { ok: false, fout: 'rond dit adres zijn geen kadastrale percelen gevonden; probeer opnieuw of een preciezer adres' }
       }
-      kavelBron = { adres: detail, percelen }
+      const thuis = percelen.find(p => puntInPerceel(detail.lon, detail.lat, p)) || null
+      kavelBron = { adres: detail, percelen, thuisId: thuis?.id ?? null }
       signaal('kavelBron', kavelBron)
+      const kort = p => ({
+        id: p.id, sectie: p.sectie, perceelnummer: p.perceelnummer, oppervlakte: p.oppervlakte,
+        ...(p.oppervlakte > MOEDERPERCEEL_M2 ? { waarschijnlijkMoederperceel: true } : {}),
+      })
+      // voor het gesprek alleen het thuisperceel plus een handvol
+      // buurpercelen; de volledige laag staat op de kaart
       return {
         ok: true, adres: detail.weergavenaam, aantalPercelen: percelen.length,
-        percelen: percelen.map(p => ({ id: p.id, sectie: p.sectie, perceelnummer: p.perceelnummer, oppervlakte: p.oppervlakte })),
+        thuisPerceel: thuis ? kort(thuis) : null,
+        percelen: [...percelen].sort((a, b) => a.oppervlakte - b.oppervlakte).slice(0, 15).map(kort),
       }
     },
 
     async kavelKiezen({ perceelId }) {
-      const p = kavelBron.percelen.find(x => x.id === String(perceelId))
+      const gezocht = String(perceelId)
+      const p = kavelBron.percelen.find(x => x.id === gezocht)
+        || kavelBron.percelen.find(x => String(x.perceelnummer) === gezocht)
       if (!p) return { ok: false, fout: 'onbekend perceel; zoek eerst het adres en wijs het perceel op de kaart aan' }
       const kavel = {
+        herkomst: 'kadastraal',
         adres: kavelBron.adres?.weergavenaam ?? null,
         lon: kavelBron.adres?.lon ?? null,
         lat: kavelBron.adres?.lat ?? null,
@@ -100,7 +126,40 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
       signaal('kavel', kavel)
       // de geometrie blijft in de sessie maar hoort niet in het gesprek
       const { geometrie, ...voorGesprek } = kavel
-      return { ok: true, kavel: voorGesprek }
+      return {
+        ok: true, kavel: voorGesprek,
+        ...(p.oppervlakte > MOEDERPERCEEL_M2 ? { waarschijnlijkMoederperceel: true } : {}),
+      }
+    },
+
+    // zet de kaart in tekenmodus; de klant klikt hoekpunten en de app
+    // meldt zich via kavelIntekenen zodra het vlak gesloten is
+    async kavelTekenenStarten() {
+      signaal('tekenModus', { aan: true })
+      return { ok: true, uitleg: 'de kaart staat in tekenmodus; de klant klikt de hoekpunten van de kavel en sluit het vlak' }
+    },
+
+    // de zelf ingetekende kavel: hoekpunten in lon/lat, oppervlakte
+    // wordt hier berekend en de herkomst expliciet vastgelegd
+    async kavelIntekenen({ punten }) {
+      if (!Array.isArray(punten) || punten.length < 3) {
+        return { ok: false, fout: 'teken minstens drie hoekpunten' }
+      }
+      const oppervlakte = Math.round(ringOppervlakteM2(punten))
+      if (oppervlakte < 20) return { ok: false, fout: 'het getekende vlak is onwaarschijnlijk klein; teken de kavel opnieuw' }
+      const ring = [...punten, punten[0]]
+      const kavel = {
+        herkomst: 'zelf ingetekend',
+        adres: kavelBron.adres?.weergavenaam ?? null,
+        lon: kavelBron.adres?.lon ?? null,
+        lat: kavelBron.adres?.lat ?? null,
+        perceelId: null, sectie: null, perceelnummer: null, gemeente: null,
+        oppervlakte, geometrie: { type: 'Polygon', coordinates: [ring] },
+      }
+      await zet({ kavel })
+      signaal('kavel', kavel)
+      signaal('tekenModus', { aan: false })
+      return { ok: true, kavel: { herkomst: kavel.herkomst, adres: kavel.adres, oppervlakte } }
     },
 
     async programmaVastleggen(args) {
@@ -136,7 +195,9 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
       }
       if (stap === 2) {
         const kavel = sessie().kavel
-        if (!kavel || !kavel.perceelId) return { ok: false, fout: 'kies eerst het perceel op de kaart' }
+        if (!kavel || !(kavel.perceelId || kavel.herkomst === 'zelf ingetekend')) {
+          return { ok: false, fout: 'kies eerst het perceel op de kaart of teken de kavel zelf in' }
+        }
         const programma = sessie().programma
         if (!programma || !programma.woonoppervlakte || !programma.slaapkamers) {
           return { ok: false, fout: 'leg eerst het programma vast (minstens woonoppervlakte en slaapkamers)' }
