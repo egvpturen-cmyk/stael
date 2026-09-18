@@ -115,8 +115,14 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
     ruimTekeningOp()
     tekenenRef.current = true
     zetTekenen(true)
-    zetSelectie(null)
     zetMelding(null)
+    // inzoomen op het gekozen of thuisperceel, zodat hoekpunten op
+    // kavelschaal te plaatsen zijn; anders een stap dichterbij
+    const doelId = selectie?.id || kavelBron?.thuisId || kavel?.perceelId
+    const doel = perceelLaag.current?.getLayers?.().find(l => l.feature?.properties?.id === doelId)
+    if (doel) kaartRef.current.fitBounds(doel.getBounds().pad(0.8), { maxZoom: 19 })
+    else kaartRef.current.setZoom(Math.min(kaartRef.current.getZoom() + 2, 19))
+    zetSelectie(null)
   }
 
   async function sluitTekening() {
@@ -209,6 +215,17 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
     }
     return undefined
   }, [kavelBron, kavel?.perceelId])
+
+  // de vastgelegde zelf ingetekende kavel blijft als vast vlak op de
+  // kaart staan, ook direct na het sluiten van de tekening
+  const eigenLaag = useRef(null)
+  useEffect(() => {
+    if (eigenLaag.current) { eigenLaag.current.remove(); eigenLaag.current = null }
+    if (kaartRef.current && kavel?.herkomst === 'zelf ingetekend' && kavel.geometrie) {
+      eigenLaag.current = L.geoJSON({ type: 'Feature', properties: {}, geometry: kavel.geometrie },
+        { style: () => ({ ...STIJL_GEKOZEN }), interactive: false }).addTo(kaartRef.current)
+    }
+  }, [kavel?.herkomst, kavel?.oppervlakte, kavelBron])
 
   useEffect(() => () => { kaartRef.current?.remove(); kaartRef.current = null }, [])
 
