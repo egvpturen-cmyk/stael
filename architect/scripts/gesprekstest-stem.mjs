@@ -5,7 +5,10 @@
 // identieke klantbeurt landt precies een keer. Draait op de
 // eventverwerker met nagespeelde Realtime-events, zonder audio en
 // zonder API-kosten.
-import { maakResponseManager, maakEventVerwerker, isDubbeleBeurt } from '../src/reis/adapter.js'
+import {
+  maakResponseManager, maakEventVerwerker, isDubbeleBeurt,
+  stuurTekstBeurt, maakTekstAdapter,
+} from '../src/reis/adapter.js'
 
 let fouten = 0
 const eis = (naam, conditie, detail) => {
@@ -103,6 +106,53 @@ const eis = (naam, conditie, detail) => {
   await verwerk({ type: 'response.output_audio_transcript.done', transcript: 'Goed, verder.' })
   eis('de buffer van een onderbroken antwoord plakt niet aan het volgende',
     transcripten.includes('architect:Goed, verder.'))
+}
+
+// ---- een getypte beurt tijdens een actieve spraakverbinding ----
+{
+  const verstuurd = []
+  const rm = maakResponseManager(o => verstuurd.push(o))
+  // de architect is nog aan het antwoorden wanneer de klant typt
+  rm.vraag()
+  rm.event('response.created')
+  verstuurd.length = 0
+  stuurTekstBeurt(o => verstuurd.push(o), rm, 'de goot mag lager')
+  eis('de getypte beurt onderbreekt eerst het lopende antwoord',
+    verstuurd[0]?.type === 'response.cancel')
+  const item = verstuurd.find(o => o.type === 'conversation.item.create')
+  eis('de getypte beurt landt als gespreksitem in de Realtime-sessie',
+    item?.item?.role === 'user' && item.item.content[0].type === 'input_text'
+    && item.item.content[0].text === 'de goot mag lager')
+  eis('de vervolgaanvraag wacht netjes op de annulering (gequeued)',
+    !verstuurd.some(o => o.type === 'response.create'))
+  rm.event('response.cancelled')
+  const create = verstuurd.find(o => o.type === 'response.create')
+  eis('daarna wordt het antwoord als AUDIO-response aangevraagd',
+    create?.response?.output_modalities?.length === 1 && create.response.output_modalities[0] === 'audio')
+
+  // ook een rustige getypte beurt (geen lopend antwoord) vraagt audio
+  const stil = []
+  const rm2 = maakResponseManager(o => stil.push(o))
+  stuurTekstBeurt(o => stil.push(o), rm2, 'ja')
+  eis('zonder lopend antwoord: item plus direct een audio-response, geen cancel',
+    !stil.some(o => o.type === 'response.cancel')
+    && stil.find(o => o.type === 'response.create')?.response?.output_modalities[0] === 'audio')
+}
+
+// ---- na Stop spraak volgt typen het tekstpad (chat completions) ----
+{
+  const opgeroepen = []
+  globalThis.fetch = async (url, opties) => {
+    opgeroepen.push(url)
+    return { ok: true, json: async () => ({ tekst: 'prima', functieAanroepen: [], ruw: { role: 'assistant', content: 'prima' } }) }
+  }
+  process.env.API_BASIS = 'http://tekstpad.test'
+  const a = maakTekstAdapter({ token: 't' })
+  a.onTranscript = () => {}
+  await a.start()
+  await a.zegTekst('ja')
+  eis('zonder spraakverbinding gaat een getypte beurt via het tekstpad van de eigen API',
+    opgeroepen.length === 1 && String(opgeroepen[0]).includes('/api/stem/tekst'))
 }
 
 console.log(fouten ? 'FAAL: ' + fouten + ' checks rood' : 'gesprekstest stem groen')

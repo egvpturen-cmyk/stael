@@ -66,11 +66,15 @@ export function maakTekstAdapter({ token }) {
 export function maakResponseManager(stuur) {
   let actief = false, wachtend = false
   const klaarTypes = ['response.done', 'response.cancelled', 'response.failed', 'response.incomplete']
+  // elke aanvraag vraagt expliciet een GESPROKEN antwoord (audio komt
+  // altijd met ondertiteling); zonder dit antwoordt het model na een
+  // getypte beurt in tekst en valt de stem stil
+  const creeer = () => stuur({ type: 'response.create', response: { output_modalities: ['audio'] } })
   return {
     vraag() {
       if (actief) { wachtend = true; return }
       actief = true
-      stuur({ type: 'response.create' })
+      creeer()
     },
     // een nieuwe gebruikersbeurt onderbreekt eerst netjes de lopende
     onderbreek() { if (actief) stuur({ type: 'response.cancel' }) },
@@ -78,11 +82,23 @@ export function maakResponseManager(stuur) {
       if (type === 'response.created') actief = true
       if (klaarTypes.includes(type)) {
         actief = false
-        if (wachtend) { wachtend = false; actief = true; stuur({ type: 'response.create' }) }
+        if (wachtend) { wachtend = false; actief = true; creeer() }
       }
     },
     isActief: () => actief,
   }
+}
+
+// een getypte beurt tijdens een actieve spraakverbinding: als
+// gespreksitem de Realtime-sessie in, lopend antwoord eerst netjes
+// onderbreken, en het antwoord komt gesproken via de response-manager
+export function stuurTekstBeurt(stuur, rm, tekst) {
+  rm.onderbreek()
+  stuur({
+    type: 'conversation.item.create',
+    item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: tekst }] },
+  })
+  rm.vraag()
 }
 
 // dezelfde gebruikersbeurt mag nooit twee keer in het gesprek landen;
@@ -166,6 +182,7 @@ export function maakRealtimeAdapter({ token, stemOverride, sprekenBijStart }) {
           type: 'realtime',
           instructions: SYSTEEM,
           tools: FUNCTIES.map(f => ({ type: 'function', ...f })),
+          output_modalities: ['audio'],
           audio: {
             input: { transcription: { model: 'whisper-1' } },
             ...(stemOverride ? { output: { voice: stemOverride } } : {}),
@@ -204,13 +221,7 @@ export function maakRealtimeAdapter({ token, stemOverride, sprekenBijStart }) {
 
   a.zegTekst = async tekst => {
     a.onTranscript('klant', tekst, true)
-    // een nieuwe beurt onderbreekt eerst netjes een lopend antwoord
-    rm.onderbreek()
-    stuur({
-      type: 'conversation.item.create',
-      item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: tekst }] },
-    })
-    rm.vraag()
+    stuurTekstBeurt(stuur, rm, tekst)
   }
 
   a.stop = () => {

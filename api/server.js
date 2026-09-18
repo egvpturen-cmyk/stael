@@ -152,6 +152,9 @@ app.post('/api/stem/sessie', async (req, res) => {
           type: 'realtime', model,
           instructions: SYSTEEM + sessieContext(sessieStand),
           tools: FUNCTIES.map(f => ({ type: 'function', ...f })),
+          // antwoorden komen altijd gesproken (met ondertiteling), ook
+          // op een getypte beurt binnen de spraaksessie
+          output_modalities: ['audio'],
           audio: {
             input: { transcription: { model: 'whisper-1' } },
             output: { voice: stem },

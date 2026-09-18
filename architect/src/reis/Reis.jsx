@@ -139,6 +139,9 @@ export default function Reis() {
     a.onFunctionCall = (naam, args) => functiesRef.current.voerUit(naam, args)
     a.onStatus = st => {
       if (st.startsWith('fout:')) {
+        // de kapotte spraakadapter gaat weg, zodat de eerstvolgende
+        // getypte beurt automatisch het tekstpad neemt
+        adapterRef.current = null
         zetStatus('tekst')
         zetMelding(st.includes('429') || st.includes('tijd')
           ? 'De spreektijd voor vandaag is op; we gaan gewoon verder via tekst.'
