@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { LUCHTFOTO, pdokFixtureAan, zoekGebied } from './pdok.js'
+import { LUCHTFOTO, pdokFixtureAan, zoekGebied, ZOEKSTRAAL_M } from './pdok.js'
 import { ringOppervlakteM2 } from './functies.js'
 
 // Stap 2: kavel en programma. De klant zoekt het adres, wijst het
@@ -36,8 +36,12 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
   const [selectie, zetSelectie] = useState(null)
   const [tekenen, zetTekenen] = useState(false)
   const [tekenStand, zetTekenStand] = useState({ punten: 0, oppervlakte: 0 })
+  const [bijladen, zetBijladen] = useState(false)
   const tekenenRef = useRef(false)
   const tekening = useRef({ markers: [], polygon: null })
+  const opPanRef = useRef(null)
+  const bijladenRef = useRef(false)
+  const gefitteZoek = useRef(0)
   const kavel = sessie.kavel
   const programma = sessie.programma || {}
   const [form, zetForm] = useState({
@@ -136,6 +140,24 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
   // de Architect kan de tekenmodus starten (kavelTekenenStarten)
   useEffect(() => { if (tekenVraag > 0) startTekenen() }, [tekenVraag])
 
+  // naladen bij pannen: pant de klant naar een gebied zonder geladen
+  // percelen, dan laadt de app ze bij met een korte indicatie; een
+  // mislukking is nooit stil
+  opPanRef.current = async () => {
+    if (tekenenRef.current || !kavelBron || !kaartRef.current || bijladenRef.current) return
+    const c = kaartRef.current.getCenter()
+    const mPerLon = 111320 * Math.cos(c.lat * Math.PI / 180)
+    const dichtbij = (kavelBron.centra || []).some(p =>
+      Math.hypot((p.lon - c.lng) * mPerLon, (p.lat - c.lat) * 111320) < ZOEKSTRAAL_M * 0.8)
+    if (dichtbij) return
+    bijladenRef.current = true
+    zetBijladen(true)
+    const r = await functies.voerUit('kavelBijladen', { lon: c.lng, lat: c.lat })
+    bijladenRef.current = false
+    zetBijladen(false)
+    if (!r.ok) zetMelding('De percelen konden hier niet geladen worden; probeer opnieuw of zoom uit.')
+  }
+
   async function rondAf() {
     await legProgrammaVast()
     const klaar = await functies.voerUit('stapAfronden', { stap: 2 })
@@ -175,6 +197,7 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
         if (e.originalEvent && e.originalEvent._opPerceel) return
         zetMelding('Hier vind ik geen perceel; klik binnen een koperen perceelgrens.')
       })
+      kaart.on('moveend', () => { if (opPanRef.current) opPanRef.current() })
       kaartRef.current = kaart
     }
 
@@ -204,14 +227,15 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
       if (el) el.setAttribute('data-perceel', l.feature.properties.id)
     })
     perceelLaag.current = laag
-    // scherpstellen op het zoekgebied rond het adres: daarbinnen is
-    // elk stuk kaart per constructie gedekt door geladen percelen
-    // (de laag zelf kan kilometerslange weg- en dijkpercelen bevatten
-    // die het beeld anders ver zouden laten uitzoomen); bij hervatten
-    // zonder verse zoekactie stelt de kaart scherp op het gekozen
-    // perceel zelf
+    // scherpstellen op het zoekgebied rond het adres, maar alleen bij
+    // een VERSE zoekactie (zoekTeller): bijgeladen percelen na pannen
+    // mogen het beeld nooit terugtrekken; bij hervatten zonder
+    // zoekactie stelt de kaart scherp op het gekozen perceel zelf
     if (kavelBron && bron.adres.lon != null) {
-      kaartRef.current.fitBounds(zoekGebied(bron.adres.lon, bron.adres.lat), { maxZoom: 18 })
+      if ((kavelBron.zoekTeller || 0) !== gefitteZoek.current) {
+        gefitteZoek.current = kavelBron.zoekTeller || 0
+        kaartRef.current.fitBounds(zoekGebied(bron.adres.lon, bron.adres.lat), { maxZoom: 18 })
+      }
     } else if (bron.percelen.length) {
       kaartRef.current.fitBounds(laag.getBounds().pad(0.3), { maxZoom: 18 })
     }
@@ -253,13 +277,22 @@ export default function KavelStap({ sessie, functies, kavelBron, tekenVraag, mel
 
       {toonKaart && (
         <div style={{ display: 'grid', gap: '.6rem' }}>
-          <div ref={kaartDiv} className="kavelkaart" style={{
-            ...vak, height: 380, overflow: 'hidden',
-            // eigen stacking context, zodat de Leaflet-knoppen (hoge
-            // z-index) nooit over de vaste paginakop tekenen
-            position: 'relative', zIndex: 0,
-            background: pdokFixtureAan() ? '#232a2e' : '#161618',
-          }} />
+          <div style={{ position: 'relative' }}>
+            <div ref={kaartDiv} className="kavelkaart" style={{
+              ...vak, height: 380, overflow: 'hidden',
+              // eigen stacking context, zodat de Leaflet-knoppen (hoge
+              // z-index) nooit over de vaste paginakop tekenen
+              position: 'relative', zIndex: 0,
+              background: pdokFixtureAan() ? '#232a2e' : '#161618',
+            }} />
+            {bijladen && (
+              <span className="kaartlader" style={{
+                position: 'absolute', top: 10, right: 10, zIndex: 5,
+                background: 'rgba(26,26,29,.92)', border: '1px solid #C98A5E', color: '#E8B48C',
+                padding: '.3rem .7rem', borderRadius: 6, fontSize: '.78rem',
+              }}>percelen laden…</span>
+            )}
+          </div>
           {tekenen && (
             <div className="tekenpaneel" style={{ ...vak, padding: '.7rem .9rem', display: 'flex', gap: '.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ display: 'grid', gap: '.15rem', flex: '1 1 220px' }}>

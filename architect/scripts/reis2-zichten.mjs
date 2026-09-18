@@ -103,6 +103,37 @@ async function doorloop(page, naam, { volledig }) {
   await page.click('text=Dit is mijn perceel')
   await page.waitForSelector('.programmaform', { timeout: 10000 })
 
+  if (volledig) {
+    // naladen bij pannen: de volgende WFS-respons is een verschoven
+    // gebied met andere ids; na twee keer slepen laadt de kaart bij
+    const basis = JSON.parse(lees('wfs-percelen.json'))
+    const verschoven = {
+      ...basis,
+      features: basis.features.map(f => ({
+        ...f,
+        properties: { ...f.properties, identificatieLokaalID: '9' + f.properties.identificatieLokaalID },
+        geometry: JSON.parse(JSON.stringify(f.geometry).replace(/(4\.\d{6,})/g, m => String(Number(m) + 0.006))),
+      })),
+    }
+    await page.unroute('**/kadastralekaart/wfs/**')
+    await page.route('**/kadastralekaart/wfs/**', r =>
+      r.fulfill({ contentType: 'application/json', body: JSON.stringify(verschoven) }))
+    const kb = await page.locator('.kavelkaart').boundingBox()
+    for (let i = 0; i < 2; i++) {
+      await page.mouse.move(kb.x + kb.width - 60, kb.y + kb.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(kb.x + 60, kb.y + kb.height / 2, { steps: 8 })
+      await page.mouse.up()
+      await page.waitForTimeout(900)
+    }
+    const naPan = await page.evaluate(() => document.querySelectorAll('.kavelkaart path.leaflet-interactive').length)
+    console.log(naam + ' naladen bij pannen:', naPan > 12 ? 'ok (' + naPan + ' percelen)' : 'NIET (' + naPan + ')')
+    // terug naar het adres voor de rest van de doorloop
+    await page.fill('.kavelzoek input', 'Tweetandschelp 52, Monster')
+    await page.click('text=Zoek adres')
+    await page.waitForTimeout(1200)
+  }
+
   // teken-interactie: hoekpunten klikken, oppervlakte live, verslepen
   await page.click('text=Kavel zelf intekenen')
   await page.waitForSelector('.tekenpaneel', { timeout: 8000 })

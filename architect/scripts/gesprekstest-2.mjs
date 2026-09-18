@@ -79,6 +79,11 @@ try {
   eis('een onwaarschijnlijk groot perceel draagt de moederperceel-vlag',
     zoek.percelen.some(p => p.id === MOEDER_ID && p.waarschijnlijkMoederperceel === true))
 
+  // bijladen bij pannen: dubbelen worden overgeslagen, nooit stil
+  const bijNieuw = await functies.voerUit('kavelBijladen', { lon: 4.1608659, lat: 52.02000707 })
+  eis('kavelBijladen ontdubbelt en meldt het totaal',
+    bijNieuw.ok === true && bijNieuw.nieuwe === 0 && bijNieuw.totaal === 12)
+
   // scripted gesprek: perceel op nummer, programma, afronden
   const adapter = maakTestAdapter({
     script: [

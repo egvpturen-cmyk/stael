@@ -99,7 +99,11 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
         return { ok: false, fout: 'rond dit adres zijn geen kadastrale percelen gevonden; probeer opnieuw of een preciezer adres' }
       }
       const thuis = percelen.find(p => puntInPerceel(detail.lon, detail.lat, p)) || null
-      kavelBron = { adres: detail, percelen, thuisId: thuis?.id ?? null }
+      kavelBron = {
+        adres: detail, percelen, thuisId: thuis?.id ?? null,
+        centra: [{ lon: detail.lon, lat: detail.lat }],
+        zoekTeller: (kavelBron.zoekTeller || 0) + 1,
+      }
       signaal('kavelBron', kavelBron)
       const kort = p => ({
         id: p.id, sectie: p.sectie, perceelnummer: p.perceelnummer, oppervlakte: p.oppervlakte,
@@ -112,6 +116,40 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
         thuisPerceel: thuis ? kort(thuis) : null,
         percelen: [...percelen].sort((a, b) => a.oppervlakte - b.oppervlakte).slice(0, 15).map(kort),
       }
+    },
+
+    // percelen bijladen wanneer de kaart naar een gebied pant dat nog
+    // niet geladen is; dubbele percelen worden overgeslagen en de bron
+    // wordt begrensd door de verste percelen op te ruimen
+    async kavelBijladen({ lon, lat }) {
+      if (!kavelBron.adres) return { ok: false, fout: 'zoek eerst een adres' }
+      let vers
+      try {
+        vers = (await percelenRond(lon, lat)).percelen
+      } catch (e) {
+        signaal('kavelFout', { fout: String(e.message || e) })
+        return { ok: false, fout: 'de percelen konden hier niet geladen worden; probeer het opnieuw' }
+      }
+      const bekend = new Set(kavelBron.percelen.map(p => p.id))
+      const nieuwe = vers.filter(p => !bekend.has(p.id))
+      let percelen = [...kavelBron.percelen, ...nieuwe]
+      const MAX_PERCELEN = 900
+      if (percelen.length > MAX_PERCELEN) {
+        const vast = new Set([kavelBron.thuisId, sessie().kavel?.perceelId].filter(Boolean))
+        const punt = p => (p.geometrie.type === 'Polygon' ? p.geometrie.coordinates[0][0] : p.geometrie.coordinates[0][0][0])
+        const afstand = p => {
+          const [px, py] = punt(p)
+          return (px - lon) * (px - lon) * Math.cos(lat * Math.PI / 180) ** 2 + (py - lat) * (py - lat)
+        }
+        percelen = percelen
+          .map(p => [p, vast.has(p.id) ? -1 : afstand(p)])
+          .sort((a, b) => a[1] - b[1])
+          .slice(0, MAX_PERCELEN)
+          .map(([p]) => p)
+      }
+      kavelBron = { ...kavelBron, percelen, centra: [...(kavelBron.centra || []), { lon, lat }] }
+      signaal('kavelBron', kavelBron)
+      return { ok: true, nieuwe: nieuwe.length, totaal: percelen.length }
     },
 
     async kavelKiezen({ perceelId }) {
