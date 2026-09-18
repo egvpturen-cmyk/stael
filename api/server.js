@@ -120,7 +120,18 @@ app.post('/api/stem/sessie', async (req, res) => {
       headers: { Authorization: 'Bearer ' + process.env.OPENAI_API_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         expires_after: { anchor: 'created_at', seconds: 600 },
-        session: { type: 'realtime', model, audio: { output: { voice: stem } } },
+        // de sessie wordt hier volledig geconfigureerd, zodat de
+        // Architect zijn persoonlijkheid en functies altijd heeft,
+        // ook als een session.update in de browser zou mislukken
+        session: {
+          type: 'realtime', model,
+          instructions: SYSTEEM,
+          tools: FUNCTIES.map(f => ({ type: 'function', ...f })),
+          audio: {
+            input: { transcription: { model: 'whisper-1' } },
+            output: { voice: stem },
+          },
+        },
       }),
     })
     let data = await antwoord.json()

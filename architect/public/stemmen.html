@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stemproeven De Architect</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--zwart:#131315;--paneel:#1a1a1d;--koper:#C98A5E;--koperl:#E8B48C;--wit:#EFECE6;--grijs:#95928C;--lijn:#2a2a2e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--zwart);color:var(--wit);font-family:'Archivo',system-ui,sans-serif;padding:2.2rem 1.2rem 4rem}
+.kolom{max-width:760px;margin:0 auto;display:grid;gap:1rem}
+h1{font-size:1.3rem;font-weight:700;letter-spacing:.12em}
+p.uitleg{color:var(--grijs);font-size:.88rem;line-height:1.6}
+p.uitleg code{color:var(--koperl);font-family:inherit}
+.stem{display:flex;align-items:center;gap:1rem;background:var(--paneel);
+  border:1px solid var(--lijn);border-radius:8px;padding:.8rem 1rem;flex-wrap:wrap}
+.stem strong{width:90px;letter-spacing:.14em;font-size:.85rem;color:var(--koperl);text-transform:uppercase}
+.stem audio{flex:1 1 240px;min-width:0;height:36px}
+.stem a{color:var(--grijs);font-size:.75rem;letter-spacing:.06em;text-decoration:none}
+.stem a:hover{color:var(--koperl)}
+.naad{height:1px;background:var(--koper);box-shadow:0 0 10px 1px rgba(201,138,94,.7);width:180px;margin:.2rem 0 .6rem}
+</style>
+</head>
+<body>
+<div class="kolom">
+  <h1>STEMPROEVEN DE ARCHITECT</h1>
+  <div class="naad"></div>
+  <p class="uitleg">Tien kandidaatstemmen spreken dezelfde STÆL-introzin.
+    Beluister ze hier naast elkaar; live proberen in het echte gesprek kan met
+    <code>/reis?stem=naam</code>. De gekozen stem wordt vast ingesteld via de
+    omgevingsvariabele <code>STEM_STEM</code> op de api-service.</p>
+  <div id="lijst"></div>
+</div>
+<script>
+const stemmen = ['marin','cedar','alloy','ash','ballad','coral','echo','sage','shimmer','verse']
+document.getElementById('lijst').innerHTML = stemmen.map(s =>
+  '<div class="stem"><strong>' + s + '</strong>' +
+  '<audio controls preload="none" src="./stemmen/' + s + '.wav"></audio>' +
+  '<a href="./reis?stem=' + s + '">probeer live &rarr;</a></div>'
+).join('')
+</script>
+</body>
+</html>

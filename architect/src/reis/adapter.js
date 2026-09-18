@@ -74,13 +74,19 @@ export function maakRealtimeAdapter({ token, stemOverride }) {
     for (const spoor of micStroom.getTracks()) pc.addTrack(spoor, micStroom)
     dc = pc.createDataChannel('oai-events')
     dc.onopen = () => {
+      // de server configureert de sessie al volledig bij de token-
+      // uitgifte; deze update (GA-schema, met session.type) is de
+      // stemkeuze plus verdediging in de diepte
       stuur({
         type: 'session.update',
         session: {
+          type: 'realtime',
           instructions: SYSTEEM,
           tools: FUNCTIES.map(f => ({ type: 'function', ...f })),
-          input_audio_transcription: { model: 'whisper-1' },
-          ...(stemOverride ? { audio: { output: { voice: stemOverride } } } : {}),
+          audio: {
+            input: { transcription: { model: 'whisper-1' } },
+            ...(stemOverride ? { output: { voice: stemOverride } } : {}),
+          },
         },
       })
       a.onStatus('luistert')

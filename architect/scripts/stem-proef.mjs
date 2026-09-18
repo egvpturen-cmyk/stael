@@ -35,10 +35,16 @@ for (const stem of STEMMEN) {
     const stop = uitkomst => { try { ws.close() } catch { } resolve(uitkomst) }
     const tikker = setTimeout(() => stop('tijd'), 30000)
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'session.update', session: { voice: stem, output_audio_format: 'pcm16' } }))
+      ws.send(JSON.stringify({
+        type: 'session.update',
+        session: {
+          type: 'realtime',
+          audio: { output: { voice: stem, format: { type: 'audio/pcm', rate: 24000 } } },
+        },
+      }))
       ws.send(JSON.stringify({
         type: 'response.create',
-        response: { modalities: ['audio', 'text'], instructions: 'Zeg exact, in het Nederlands: ' + ZIN },
+        response: { output_modalities: ['audio'], instructions: 'Zeg exact, in het Nederlands: ' + ZIN },
       }))
     }
     ws.onmessage = e => {
