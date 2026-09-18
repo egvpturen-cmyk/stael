@@ -57,7 +57,7 @@ export function maakTekstAdapter({ token }) {
 }
 
 // ---- Realtime: spraak in en uit via WebRTC ----
-export function maakRealtimeAdapter({ token, stemOverride }) {
+export function maakRealtimeAdapter({ token, stemOverride, sprekenBijStart }) {
   const a = basis()
   let pc = null, dc = null, micStroom = null, audioEl = null, klok = null
 
@@ -65,8 +65,10 @@ export function maakRealtimeAdapter({ token, stemOverride }) {
 
   a.start = async () => {
     a.onStatus('start')
-    const s = await stemSessie(token) // kortlevend token van de eigen API
+    // eerst de microfoon: een weigering kost dan geen spreektijd van
+    // het dagplafond
     micStroom = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const s = await stemSessie(token) // kortlevend token van de eigen API
     pc = new RTCPeerConnection()
     audioEl = document.createElement('audio')
     audioEl.autoplay = true
@@ -89,6 +91,8 @@ export function maakRealtimeAdapter({ token, stemOverride }) {
           },
         },
       })
+      // bij het ontmoeten spreekt de Architect direct de welkomsttekst
+      if (sprekenBijStart) stuur({ type: 'response.create' })
       a.onStatus('luistert')
     }
     let architectBuffer = ''

@@ -12,6 +12,14 @@ const UIT = 'schermen/reis'
 fs.mkdirSync(UIT, { recursive: true })
 
 const browser = await chromium.launch()
+// door het startscherm: een klik slaat de intro over, daarna de knop
+async function voorbijStart(pagina) {
+  await pagina.waitForSelector('.introscherm', { timeout: 15000 })
+  await pagina.mouse.click(30, 30)
+  await pagina.click('.startknop', { timeout: 15000 })
+  await pagina.waitForTimeout(400)
+}
+
 const fouten = []
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 page.on('console', m => { if (m.type() === 'error' && !m.text().includes('503')) fouten.push('desktop: ' + m.text()) })
@@ -20,6 +28,7 @@ page.on('pageerror', e => fouten.push('desktop: ' + String(e)))
 const naamActief = () => page.evaluate(() => document.querySelector('.showslide.actief .naam')?.textContent)
 
 await page.goto(BASIS + '/reis')
+  await voorbijStart(page)
 await page.waitForSelector('.podium', { timeout: 20000 })
 await page.click('text=Ik typ liever')
 await page.waitForSelector('.smaakshow', { timeout: 20000 })
@@ -76,6 +85,7 @@ const deellink = page.url()
 // hervatten: stap en profiel blijven staan
 const page2 = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 await page2.goto(deellink)
+  await voorbijStart(page2)
 await page2.waitForFunction(() => document.body.textContent.includes('Wat is het adres van uw kavel?'), { timeout: 20000 })
 console.log('hervatten op stap 2 met sessie intact: ok')
 
@@ -83,6 +93,7 @@ console.log('hervatten op stap 2 met sessie intact: ok')
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 } })
 mob.on('pageerror', e => fouten.push('mobiel: ' + String(e)))
 await mob.goto(BASIS + '/reis')
+  await voorbijStart(mob)
 await mob.waitForSelector('.podium', { timeout: 20000 })
 await mob.click('text=Ik typ liever')
 await mob.waitForSelector('.showslide.actief .naam', { timeout: 20000 })

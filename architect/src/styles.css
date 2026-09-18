@@ -274,3 +274,34 @@ main{padding:1.4rem;overflow-y:auto}
   .ondertitelmini{flex:1;min-width:0;color:#e8e4dc;font-size:.8rem;line-height:1.35;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
+
+/* ---------- startscherm van de reis: de zoom door de AE ---------- */
+.introscherm{position:fixed;inset:0;z-index:100;background:var(--zwart);overflow:hidden}
+.introscherm .vonken{position:absolute;inset:0;pointer-events:none;z-index:3;opacity:.85}
+.introwrap{position:absolute;inset:0;will-change:transform;opacity:0;
+  -webkit-mask-image:url(/intro/logo.png);mask-image:url(/intro/logo.png);
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+.introfoto{position:absolute;inset:0;background:url(/intro/huis.jpg) center/cover;will-change:transform}
+.introstartlogo{position:absolute;z-index:2;opacity:0;pointer-events:none}
+.introvlak{position:absolute;inset:0;background:url(/intro/huis.jpg) center/cover;opacity:0;pointer-events:none}
+.introdoek{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;background:var(--zwart)}
+.introeinde{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:clamp(1.6rem,4vh,2.6rem);
+  opacity:0;pointer-events:none;transition:opacity .9s ease}
+.introeinde.zichtbaar{opacity:1;pointer-events:auto}
+.introeindlogo{width:min(320px,62vw)}
+.startknop{padding:1.05rem 2.6rem;border:1px solid var(--koper);
+  background:rgba(201,138,94,.08);color:var(--koper-fel);font-family:inherit;
+  font-size:1rem;letter-spacing:.22em;cursor:pointer;border-radius:2px;
+  transition:background .3s,color .3s}
+.startknop:hover{background:var(--koper);color:var(--zwart)}
+@media(max-width:860px){
+  .introeinde{justify-content:flex-start;padding-top:22vh}
+  .startknop{position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(14vh + env(safe-area-inset-bottom,0px));
+    width:min(86vw,360px);padding:1.15rem 1rem;text-align:center}
+}
+@media(prefers-reduced-motion:reduce){
+  .introwrap{-webkit-mask-image:none;mask-image:none}
+  .introeinde{transition:none}
+}

@@ -33,6 +33,14 @@ async function sessieOpStap2() {
 }
 
 const browser = await chromium.launch()
+// door het startscherm: een klik slaat de intro over, daarna de knop
+async function voorbijStart(pagina) {
+  await pagina.waitForSelector('.introscherm', { timeout: 15000 })
+  await pagina.mouse.click(30, 30)
+  await pagina.click('.startknop', { timeout: 15000 })
+  await pagina.waitForTimeout(400)
+}
+
 const fouten = []
 
 async function mock(page) {
@@ -52,6 +60,7 @@ async function doorloop(page, naam, { volledig }) {
   await mock(page)
   const token = await sessieOpStap2()
   await page.goto(BASIS + '/reis?s=' + token)
+  await voorbijStart(page)
   await page.waitForSelector('.kavelzoek input', { timeout: 20000 })
 
   await page.fill('.kavelzoek input', 'Tweetandschelp 52, Monster')
@@ -182,6 +191,7 @@ async function doorloop(page, naam, { volledig }) {
     const page2 = await browser.newPage({ viewport: page.viewportSize() })
     await mock(page2)
     await page2.goto(BASIS + '/reis?s=' + token)
+  await voorbijStart(page2)
     await page2.waitForFunction(() => document.body.textContent.includes('Nieuwe varianten'), { timeout: 20000 })
     console.log(naam + ' hervatten op stap 3 met sessie intact: ok')
     await page2.close()

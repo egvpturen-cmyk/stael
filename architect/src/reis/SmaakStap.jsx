@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { COLLECTIE } from './collectie.js'
+import { startVonken, rustigAan } from './vonken.js'
 
 // Stap 1: de conceptcollectie als cinematische show (naar de
 // goedgekeurde show-referentie), maar interactief: de klant bladert
@@ -12,56 +13,6 @@ import { COLLECTIE } from './collectie.js'
 const DUUR = 7000            // autoplay-tempo, zoals de show
 const STANDBY_NA = 30000     // autoplay hervat na een halve minuut rust
 const beeldUrl = c => './collectie/' + c.bestand
-
-const rustigAan = () => typeof matchMedia !== 'undefined'
-  && matchMedia('(prefers-reduced-motion: reduce)').matches
-
-// het lasvonken-doek uit de referentie: langzaam stijgende gloeiende
-// deeltjes plus bursts aan het einde van de lasnaad; pauzeert wanneer
-// het tabblad niet zichtbaar is en ontbreekt bij reduced motion
-function startVonken(canvas, burstRef) {
-  if (rustigAan()) { burstRef.current = () => {}; return () => {} }
-  const cx = canvas.getContext('2d')
-  let P = [], actief = true, raf = 0
-  const maat = () => {
-    const r = canvas.parentElement.getBoundingClientRect()
-    canvas.width = r.width; canvas.height = r.height
-  }
-  maat()
-  const her = () => maat()
-  addEventListener('resize', her)
-  const vonk = (bx, by) => {
-    const b = bx !== undefined
-    return {
-      x: b ? bx : Math.random() * canvas.width,
-      y: b ? by : canvas.height + 10,
-      vx: (Math.random() - .5) * (b ? 3.2 : .35),
-      vy: b ? -(Math.random() * 2.6 + .6) : -(Math.random() * .55 + .22),
-      r: Math.random() * 1.7 + .5,
-      l: 1, verval: b ? .012 + Math.random() * .012 : .0016 + Math.random() * .0022,
-      k: Math.random() < .35 ? '232,180,140' : '201,138,94',
-    }
-  }
-  for (let i = 0; i < 40; i++) { const p = vonk(); p.y = Math.random() * canvas.height; P.push(p) }
-  burstRef.current = (x, y, n = 22) => { for (let i = 0; i < n; i++) P.push(vonk(x, y)) }
-  const teken = () => {
-    if (!actief) return
-    if (document.hidden) { raf = requestAnimationFrame(teken); return }
-    cx.clearRect(0, 0, canvas.width, canvas.height)
-    if (P.length < 44 && Math.random() < .3) P.push(vonk())
-    P = P.filter(p => p.l > 0 && p.y > -20)
-    for (const p of P) {
-      p.x += p.vx; p.y += p.vy; p.vy += p.verval > .01 ? .05 : -.0004; p.l -= p.verval
-      cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 7)
-      cx.fillStyle = 'rgba(' + p.k + ',' + Math.max(p.l, 0) * .85 + ')'
-      cx.shadowColor = 'rgba(' + p.k + ',.9)'; cx.shadowBlur = 8
-      cx.fill(); cx.shadowBlur = 0
-    }
-    raf = requestAnimationFrame(teken)
-  }
-  raf = requestAnimationFrame(teken)
-  return () => { actief = false; cancelAnimationFrame(raf); removeEventListener('resize', her) }
-}
 
 // de koperen lasnaad die zich onder de naam last, met vonkenkop en een
 // burst op het doek wanneer hij de overkant haalt

@@ -6,6 +6,7 @@ import { zetPdokFixture } from './pdok.js'
 import KavelStap from './KavelStap.jsx'
 import SmaakStap from './SmaakStap.jsx'
 import ModellenStap from './ModellenStap.jsx'
+import StartScherm from './StartScherm.jsx'
 
 // De klantreis (/reis): een begeleide reis in stappen met de pratende
 // Architect als gastheer. Stem en tekst zijn hetzelfde gesprek via twee
@@ -58,6 +59,7 @@ export default function Reis() {
   const [kavelBron, zetKavelBron] = useState(null)
   const [tekenVraag, zetTekenVraag] = useState(0)
   const [gesprekOpen, zetGesprekOpen] = useState(false)
+  const [startWeg, zetStartWeg] = useState(false)
   const gesprekRef = useRef(null)
   const sessieRef = useRef({ huidige: null })
   const adapterRef = useRef(null)
@@ -138,11 +140,13 @@ export default function Reis() {
 
   const startTekst = () => koppelAdapter(maakTekstAdapter({ token }))
 
-  async function startSpraak() {
+  async function startSpraak(sprekenBijStart = false) {
     try {
       zetMelding(null)
       const url = new URL(location.href)
-      const a = koppelAdapter(maakRealtimeAdapter({ token, stemOverride: url.searchParams.get('stem') || undefined }))
+      const a = koppelAdapter(maakRealtimeAdapter({
+        token, stemOverride: url.searchParams.get('stem') || undefined, sprekenBijStart,
+      }))
       zetStatus('spraak')
       await a.start()
       await functiesRef.current.voerUit('spraakVoorkeur', { spraak: true })
@@ -185,9 +189,22 @@ export default function Reis() {
 
   const stap = sessie?.stap ?? 0
   const laatsteArchitect = [...berichten].reverse().find(b => b.rol === 'architect')?.tekst || 'De Architect luistert mee.'
+  // hervatten: er is al voortgang, dus geen volle intro en geen
+  // hernieuwde kennismaking
+  const hervatten = !!sessie && (sessie.stap > 0 || sessie.spraakOk !== null)
+
+  // vanaf het startscherm: bij het ontmoeten start de stem en spreekt
+  // de Architect de welkomsttekst; lukt spraak niet, dan gaat de reis
+  // via tekst gewoon door (het podium houdt de keuzeknoppen)
+  async function bijStart() {
+    zetStartWeg(true)
+    if (!hervatten) await startSpraak(true)
+    else if (sessie?.spraakOk === true) await startSpraak(true)
+  }
 
   return (
     <div className="reis">
+      {sessie && !startWeg && <StartScherm hervatten={hervatten} onStart={bijStart} />}
       <header className="reiskop">
         <img src="./wordmark.png" alt="STÆL" style={{ height: 20 }} />
         <span className="titel">DE ARCHITECT <em>begeleide klantreis</em></span>
@@ -266,7 +283,7 @@ export default function Reis() {
             <button type="button" className="nieuweset invoerknop" onClick={verstuur}>Verstuur</button>
             {status === 'spraak'
               ? <button type="button" className="nieuweset invoerknop" onClick={stopSpraak} title="Stop het spraakgesprek">⏹ Stop</button>
-              : <button type="button" className="nieuweset invoerknop" onClick={startSpraak} title="Start het spraakgesprek">🎙</button>}
+              : <button type="button" className="nieuweset invoerknop" onClick={() => startSpraak()} title="Start het spraakgesprek">🎙</button>}
           </div>
           <p className="gesprekhint">
             Praten en typen zijn hetzelfde gesprek; u kunt altijd wisselen. Uw sessie is te hervatten via de link in de adresbalk.

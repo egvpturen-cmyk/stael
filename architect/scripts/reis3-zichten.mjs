@@ -17,6 +17,14 @@ const lees = naam => fs.readFileSync(path.join(hier, 'testdata', naam), 'utf8')
 const TEGEL = Buffer.from('/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==', 'base64')
 
 const browser = await chromium.launch()
+// door het startscherm: een klik slaat de intro over, daarna de knop
+async function voorbijStart(pagina) {
+  await pagina.waitForSelector('.introscherm', { timeout: 15000 })
+  await pagina.mouse.click(30, 30)
+  await pagina.click('.startknop', { timeout: 15000 })
+  await pagina.waitForTimeout(400)
+}
+
 const fouten = []
 
 async function mock(page) {
@@ -36,6 +44,7 @@ page.on('pageerror', e => fouten.push('desktop: ' + String(e)))
 await mock(page)
 
 await page.goto(BASIS + '/reis')
+  await voorbijStart(page)
 await page.waitForSelector('.podium', { timeout: 20000 })
 await page.click('text=Ik typ liever')
 
@@ -118,6 +127,7 @@ const page2 = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 page2.on('pageerror', e => fouten.push('hervat: ' + String(e)))
 await mock(page2)
 await page2.goto(deellink)
+  await voorbijStart(page2)
 await page2.waitForSelector('.gekozenvak', { timeout: 30000 })
 const hervat = await page2.evaluate(() => ({
   kaarten: document.querySelectorAll('.reisvariant').length,
@@ -143,6 +153,7 @@ const mob = await browser.newPage({ viewport: { width: 390, height: 844 } })
 mob.on('pageerror', e => fouten.push('mobiel: ' + String(e)))
 await mock(mob)
 await mob.goto(BASIS + '/reis?s=' + token)
+  await voorbijStart(mob)
 await mob.waitForSelector('.reisvariant', { timeout: 40000 })
 await mob.waitForTimeout(2500)
 const mobKaarten = await mob.evaluate(() => document.querySelectorAll('.reisvariant').length)

@@ -85,8 +85,8 @@ try {
   eis('naarStap buiten bereik wordt geweigerd', (await functies.voerUit('naarStap', { stap: 9 })).ok === false)
   eis('stapAfronden op een andere stap wordt geweigerd', (await functies.voerUit('stapAfronden', { stap: 3 })).ok === false)
   eis('favoriet buiten de collectie wordt geweigerd', (await functies.voerUit('favorietKiezen', { nummer: 99, aan: true })).ok === false)
-  eis('parameterWijzigen meldt eerlijk zijn grens voor stap 3',
-    (await functies.voerUit('parameterWijzigen', { pad: 'volume.goot', waarde: 2.6 })).fout.includes('stap 3'))
+  eis('parameterWijzigen weigert eerlijk zonder gekozen variant',
+    (await functies.voerUit('parameterWijzigen', { pad: 'volume.goot', waarde: 2.6 })).fout.includes('variant'))
   eis('onbekende functie geeft een nette fout', (await functies.voerUit('bestaatNiet', {})).ok === false)
 } finally {
   console.log(fouten ? 'FAAL: ' + fouten + ' checks rood' : 'gesprekstest 0 groen')
