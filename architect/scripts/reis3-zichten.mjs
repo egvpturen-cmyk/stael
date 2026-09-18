@@ -36,7 +36,7 @@ page.on('pageerror', e => fouten.push('desktop: ' + String(e)))
 await mock(page)
 
 await page.goto(BASIS + '/reis')
-await page.waitForSelector('.gesprek', { timeout: 20000 })
+await page.waitForSelector('.podium', { timeout: 20000 })
 await page.click('text=Ik typ liever')
 
 // stap 1: drie favorieten met een citaat

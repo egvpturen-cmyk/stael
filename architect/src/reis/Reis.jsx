@@ -16,28 +16,31 @@ const STAPPEN = ['Smaak', 'Kavel en programma', 'Modellen', 'Beelden']
 
 const vak = { background: '#161618', border: '1px solid #2c2c30', borderRadius: 8 }
 
+// compacte voortgang voor in de kopbalk: bolletjes per stap, alleen
+// de actieve stap draagt zijn naam
 function Voortgang({ stap }) {
   return (
-    <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className="kopvoortgang" style={{ display: 'flex', gap: '.35rem', alignItems: 'center' }}>
       {STAPPEN.map((naam, i) => {
         const nr = i + 1
         const actief = stap === nr
         const klaar = stap > nr
         return (
           <div key={naam} style={{
-            display: 'flex', alignItems: 'center', gap: '.45rem',
-            padding: '.35rem .7rem', borderRadius: 999,
+            display: 'flex', alignItems: 'center', gap: '.35rem',
+            padding: actief ? '.2rem .6rem .2rem .2rem' : '.2rem',
+            borderRadius: 999,
             border: '1px solid ' + (actief ? '#e8873c' : '#2c2c30'),
-            background: actief ? '#241a12' : '#161618',
+            background: actief ? '#241a12' : 'transparent',
             color: klaar ? '#8fc493' : actief ? '#e8e4dc' : '#77756f',
-            fontSize: '.8rem', letterSpacing: '.04em',
+            fontSize: '.72rem', letterSpacing: '.04em', whiteSpace: 'nowrap',
           }}>
             <span style={{
-              width: 20, height: 20, borderRadius: 999, display: 'grid', placeItems: 'center',
+              width: 18, height: 18, borderRadius: 999, display: 'grid', placeItems: 'center',
               background: klaar ? '#24321f' : actief ? '#e8873c' : '#232326',
-              color: actief ? '#141414' : 'inherit', fontSize: '.72rem',
+              color: actief ? '#141414' : 'inherit', fontSize: '.66rem',
             }}>{klaar ? '✓' : nr}</span>
-            {naam}
+            {actief && naam}
           </div>
         )
       })}
@@ -54,6 +57,8 @@ export default function Reis() {
   const [melding, zetMelding] = useState(null)
   const [kavelBron, zetKavelBron] = useState(null)
   const [tekenVraag, zetTekenVraag] = useState(0)
+  const [gesprekOpen, zetGesprekOpen] = useState(false)
+  const gesprekRef = useRef(null)
   const sessieRef = useRef({ huidige: null })
   const adapterRef = useRef(null)
   const functiesRef = useRef(null)
@@ -109,7 +114,12 @@ export default function Reis() {
     })()
   }, [])
 
-  useEffect(() => { onderaan.current?.scrollIntoView({ behavior: 'smooth' }) }, [berichten])
+  // het gesprek scrolt binnen zijn eigen kolom; het podium beweegt
+  // nooit mee met nieuwe beurten
+  useEffect(() => {
+    const el = gesprekRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [berichten, gesprekOpen])
 
   const koppelAdapter = a => {
     a.onTranscript = (rol, tekst, definitief) => toonBericht(rol, tekst, definitief)
@@ -174,79 +184,94 @@ export default function Reis() {
   }
 
   const stap = sessie?.stap ?? 0
+  const laatsteArchitect = [...berichten].reverse().find(b => b.rol === 'architect')?.tekst || 'De Architect luistert mee.'
 
   return (
-    <div className="kalibratie" style={{ minHeight: '100vh' }}>
-      <header>
-        <img src="./wordmark.png" alt="STÆL" style={{ height: 22 }} />
+    <div className="reis">
+      <header className="reiskop">
+        <img src="./wordmark.png" alt="STÆL" style={{ height: 20 }} />
         <span className="titel">DE ARCHITECT <em>begeleide klantreis</em></span>
+        <Voortgang stap={stap} />
       </header>
 
-      <div style={{ maxWidth: stap === 1 || stap === 3 ? 1280 : 880, margin: '0 auto', padding: '1.1rem 1rem 2rem', display: 'grid', gap: '.9rem' }}>
-        <Voortgang stap={stap} />
+      <div className="reisvlak">
+        {/* het podium: hier gebeurt alles */}
+        <main className="podium">
+          {melding && (
+            <div style={{ ...vak, padding: '.6rem .8rem', color: '#d9b06a', fontSize: '.85rem', marginBottom: '.8rem' }}>{melding}</div>
+          )}
 
-        {melding && (
-          <div style={{ ...vak, padding: '.6rem .8rem', color: '#d9b06a', fontSize: '.85rem' }}>{melding}</div>
-        )}
-
-        <div className="gesprek" style={{ ...vak, padding: '1rem', display: 'grid', gap: '.6rem', minHeight: 260 }}>
-          {berichten.map((b, i) => (
-            <div key={i} className={'beurt-' + b.rol} style={{
-              justifySelf: b.rol === 'klant' ? 'end' : 'start',
-              maxWidth: '85%', padding: '.55rem .8rem', borderRadius: 10,
-              background: b.rol === 'klant' ? '#2a2317' : '#1d1d21',
-              border: '1px solid ' + (b.rol === 'klant' ? '#4a3a20' : '#2c2c30'),
-              color: '#e8e4dc', lineHeight: 1.45, fontSize: '.92rem',
-              opacity: b.definitief ? 1 : .75,
-            }}>
-              {b.rol === 'architect' && <span style={{ display: 'block', fontSize: '.68rem', letterSpacing: '.09em', color: '#e8873c', marginBottom: '.2rem' }}>DE ARCHITECT</span>}
-              {b.tekst}
+          {stap === 0 && sessie && (
+            <div className="ontvangst" style={{ ...vak, maxWidth: 560, margin: '8vh auto 0', padding: '1.4rem', display: 'grid', gap: '.9rem', justifyItems: 'start' }}>
+              <strong style={{ color: '#e8e4dc', letterSpacing: '.06em' }}>Welkom bij STÆL</strong>
+              <p style={{ color: '#a7a49c', margin: 0, lineHeight: 1.55, fontSize: '.9rem' }}>
+                De Architect neemt u in vier stappen mee naar uw woning: uw smaak, uw kavel en programma, de modellen en de beelden.
+              </p>
+              <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+                <button type="button" className="nieuweset" onClick={() => kiesSpraakVoorkeur(true)}>Praten is prima</button>
+                <button type="button" className="nieuweset" onClick={() => kiesSpraakVoorkeur(false)}>Ik typ liever</button>
+              </div>
             </div>
-          ))}
-          <div ref={onderaan} />
-        </div>
+          )}
 
-        {stap === 0 && sessie && (
-          <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
-            <button type="button" className="nieuweset" onClick={() => kiesSpraakVoorkeur(true)}>Praten is prima</button>
-            <button type="button" className="nieuweset" onClick={() => kiesSpraakVoorkeur(false)}>Ik typ liever</button>
+          {stap === 1 && sessie && (
+            <SmaakStap sessie={sessie} functies={functiesRef.current} meldArchitect={t => toonBericht('architect', t)} />
+          )}
+
+          {stap === 2 && sessie && (
+            <KavelStap sessie={sessie} functies={functiesRef.current} kavelBron={kavelBron}
+              tekenVraag={tekenVraag} meldArchitect={t => toonBericht('architect', t)} />
+          )}
+
+          {stap === 3 && sessie && (
+            <ModellenStap sessie={sessie} functies={functiesRef.current}
+              meldArchitect={t => toonBericht('architect', t)} />
+          )}
+
+          {stap > 3 && (
+            <div style={{ ...vak, padding: '.8rem', color: '#a7a49c', fontSize: '.88rem' }}>
+              Stap {stap} ({STAPPEN[stap - 1]}) wordt in het volgende bouwdeel ingericht; het gesprek en uw sessie lopen gewoon door.
+            </div>
+          )}
+        </main>
+
+        {/* het gesprek: eigen kolom rechts, op mobiel een uitklapbalk */}
+        <aside className={'gesprekspaneel' + (gesprekOpen ? ' open' : '')}>
+          <button type="button" className="gesprekgreep" onClick={() => zetGesprekOpen(o => !o)}
+            aria-label={gesprekOpen ? 'Gesprek inklappen' : 'Gesprek uitklappen'}>
+            <span className="ondertitelmini">{laatsteArchitect}</span>
+            <span style={{ flex: 'none', color: '#e8873c' }}>{gesprekOpen ? '▾' : '▴'}</span>
+          </button>
+          <div className="gesprek" ref={gesprekRef}>
+            {berichten.map((b, i) => (
+              <div key={i} className={'beurt-' + b.rol} style={{
+                justifySelf: b.rol === 'klant' ? 'end' : 'start',
+                maxWidth: '92%', padding: '.5rem .75rem', borderRadius: 10,
+                background: b.rol === 'klant' ? '#2a2317' : '#1d1d21',
+                border: '1px solid ' + (b.rol === 'klant' ? '#4a3a20' : '#2c2c30'),
+                color: '#e8e4dc', lineHeight: 1.45, fontSize: '.88rem',
+                opacity: b.definitief ? 1 : .75,
+              }}>
+                {b.rol === 'architect' && <span style={{ display: 'block', fontSize: '.66rem', letterSpacing: '.09em', color: '#e8873c', marginBottom: '.15rem' }}>DE ARCHITECT</span>}
+                {b.tekst}
+              </div>
+            ))}
+            <div ref={onderaan} />
           </div>
-        )}
-
-        {stap === 1 && sessie && (
-          <SmaakStap sessie={sessie} functies={functiesRef.current} meldArchitect={t => toonBericht('architect', t)} />
-        )}
-
-        {stap === 2 && sessie && (
-          <KavelStap sessie={sessie} functies={functiesRef.current} kavelBron={kavelBron}
-            tekenVraag={tekenVraag} meldArchitect={t => toonBericht('architect', t)} />
-        )}
-
-        {stap === 3 && sessie && (
-          <ModellenStap sessie={sessie} functies={functiesRef.current}
-            meldArchitect={t => toonBericht('architect', t)} />
-        )}
-
-        {stap > 3 && (
-          <div style={{ ...vak, padding: '.8rem', color: '#a7a49c', fontSize: '.88rem' }}>
-            Stap {stap} ({STAPPEN[stap - 1]}) wordt in het volgende bouwdeel ingericht; het gesprek en uw sessie lopen gewoon door.
+          <div className="invoerbalk">
+            <input value={invoer} onChange={e => zetInvoer(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') verstuur() }}
+              placeholder="Typ uw antwoord aan de Architect"
+              style={{ flex: '1 1 auto', minWidth: 0, background: '#1c1c1f', color: '#e8e4dc', border: '1px solid #3a3a3e', borderRadius: 6, padding: '.55rem .65rem' }} />
+            <button type="button" className="nieuweset invoerknop" onClick={verstuur}>Verstuur</button>
+            {status === 'spraak'
+              ? <button type="button" className="nieuweset invoerknop" onClick={stopSpraak} title="Stop het spraakgesprek">⏹ Stop</button>
+              : <button type="button" className="nieuweset invoerknop" onClick={startSpraak} title="Start het spraakgesprek">🎙</button>}
           </div>
-        )}
-
-        <div className="invoerbalk" style={{ display: 'flex', gap: '.55rem', flexWrap: 'wrap' }}>
-          <input value={invoer} onChange={e => zetInvoer(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') verstuur() }}
-            placeholder="Typ uw antwoord aan de Architect"
-            style={{ flex: '1 1 200px', minWidth: 0, background: '#1c1c1f', color: '#e8e4dc', border: '1px solid #3a3a3e', borderRadius: 6, padding: '.6rem .7rem' }} />
-          <button type="button" className="nieuweset" onClick={verstuur}>Verstuur</button>
-          {status === 'spraak'
-            ? <button type="button" className="nieuweset" onClick={stopSpraak} title="Stop het spraakgesprek">Stop spraak</button>
-            : <button type="button" className="nieuweset" onClick={startSpraak} title="Start het spraakgesprek">🎙 Spreek</button>}
-        </div>
-        <p style={{ color: '#77756f', fontSize: '.78rem', margin: 0 }}>
-          Alles wat de Architect zegt, leest u hier ook mee. Praten en typen zijn hetzelfde gesprek; u kunt altijd wisselen.
-          Uw sessie is te hervatten via de link in de adresbalk.
-        </p>
+          <p className="gesprekhint">
+            Praten en typen zijn hetzelfde gesprek; u kunt altijd wisselen. Uw sessie is te hervatten via de link in de adresbalk.
+          </p>
+        </aside>
       </div>
     </div>
   )
