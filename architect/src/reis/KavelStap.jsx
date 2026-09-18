@@ -14,8 +14,10 @@ const veldStijl = {
   borderRadius: 5, padding: '.45rem .55rem', fontSize: '.85rem', width: '100%', boxSizing: 'border-box',
 }
 
-const STIJL_GEWOON = { color: '#f2f0ea', weight: 1.5, fillColor: '#f2f0ea', fillOpacity: 0.06 }
-const STIJL_GEKOZEN = { color: '#e8873c', weight: 2.5, fillColor: '#e8873c', fillOpacity: 0.18 }
+// koperen randlijnen, zodat de perceelgrenzen ook op een lichte
+// luchtfoto (zand, kassen, wegmarkering) onmiskenbaar opvallen
+const STIJL_GEWOON = { color: '#C98A5E', weight: 2.5, fillColor: '#C98A5E', fillOpacity: 0.10 }
+const STIJL_GEKOZEN = { color: '#E8B48C', weight: 4, fillColor: '#E8B48C', fillOpacity: 0.30 }
 
 export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }) {
   const kaartDiv = useRef(null)
@@ -91,9 +93,12 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
       L.circleMarker([bron.adres.lat, bron.adres.lon], {
         radius: 6, color: '#e8873c', fillColor: '#e8873c', fillOpacity: 0.9, weight: 2, interactive: false,
       }).addTo(kaart)
+      // een klik naast alle percelen krijgt altijd een reactie
+      kaart.on('click', e => {
+        if (e.originalEvent && e.originalEvent._opPerceel) return
+        zetMelding('Hier vind ik geen perceel; klik binnen een koperen perceelgrens.')
+      })
       kaartRef.current = kaart
-    } else {
-      kaartRef.current.setView([bron.adres.lat, bron.adres.lon], 18)
     }
 
     if (perceelLaag.current) perceelLaag.current.remove()
@@ -103,15 +108,26 @@ export default function KavelStap({ sessie, functies, kavelBron, meldArchitect }
       {
         style: f => (f.properties.id === gekozenId ? STIJL_GEKOZEN : STIJL_GEWOON),
         onEachFeature: (f, layer) => {
-          layer.on('click', () => {
+          layer.on('click', e => {
+            if (e.originalEvent) e.originalEvent._opPerceel = true
             const p = bron.percelen.find(x => x.id === f.properties.id)
             zetSelectie(p || null)
+            zetMelding(null)
             laag.setStyle(g => (g.properties.id === f.properties.id ? STIJL_GEKOZEN : STIJL_GEWOON))
           })
         },
       },
     ).addTo(kaartRef.current)
+    laag.eachLayer(l => {
+      const el = l.getElement && l.getElement()
+      if (el) el.setAttribute('data-perceel', l.feature.properties.id)
+    })
     perceelLaag.current = laag
+    // het kaartbeeld volgt altijd de geladen percelenlaag, zodat er
+    // nooit kaart zonder aanwijsbare percelen in beeld staat
+    if (bron.percelen.length) {
+      kaartRef.current.fitBounds(laag.getBounds().pad(0.04), { maxZoom: 18 })
+    }
     return undefined
   }, [kavelBron, kavel?.perceelId])
 

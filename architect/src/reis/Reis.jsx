@@ -92,7 +92,8 @@ export default function Reis() {
         functiesRef.current = maakFuncties({
           token: t, sessieRef: { get huidige() { return sessieRef.current.huidige }, set huidige(v) { sessieRef.current.huidige = v; zetSessie(v) } },
           opUiSignaal: (naam, data) => {
-            if (naam === 'kavelBron') zetKavelBron(data)
+            if (naam === 'kavelBron') { zetKavelBron(data); zetMelding(null) }
+            if (naam === 'kavelFout') zetMelding('De percelen konden niet geladen worden; probeer het opnieuw.')
             zetSessie({ ...sessieRef.current.huidige })
           },
         })

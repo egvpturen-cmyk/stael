@@ -1,0 +1,13 @@
+{
+  "response":{
+    "numFound":1,
+    "start":0,
+    "maxScore":7.220005,
+    "numFoundExact":true,
+    "docs":[{
+      "weergavenaam":"Tweetandschelp 52, 2681DM Monster",
+      "id":"adr-fe67c661c551fe9a61cee8920aa601ce",
+      "centroide_ll":"POINT(4.1608659 52.02000707)"
+    }]
+  }
+}

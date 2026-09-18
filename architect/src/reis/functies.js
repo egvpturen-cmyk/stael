@@ -58,16 +58,30 @@ export function maakFuncties({ token, sessieRef, opUiSignaal }) {
       return { ok: true, favorieten: smaak.favorieten }
     },
 
+    // De regel: de Architect belooft alleen wat hier bevestigd is.
+    // kavelZoeken meldt ok pas wanneer de percelenlaag echt geladen is
+    // met minstens een perceel; anders een eerlijke fout, ook zichtbaar
+    // in de app via het kavelFout-signaal.
     async kavelZoeken({ adres }) {
       if (!adres || !adres.trim()) return { ok: false, fout: 'geen adres opgegeven' }
       const suggesties = await zoekAdres(adres.trim())
       if (!suggesties.length) return { ok: false, fout: 'geen adres gevonden voor "' + adres.trim() + '"' }
       const detail = await adresDetail(suggesties[0].id)
-      const { percelen } = await percelenRond(detail.lon, detail.lat)
+      let percelen
+      try {
+        percelen = (await percelenRond(detail.lon, detail.lat)).percelen
+      } catch (e) {
+        signaal('kavelFout', { fout: String(e.message || e) })
+        return { ok: false, fout: 'de percelen konden niet geladen worden (' + String(e.message || e) + '); probeer het opnieuw' }
+      }
+      if (!percelen.length) {
+        signaal('kavelFout', { fout: 'geen percelen gevonden' })
+        return { ok: false, fout: 'rond dit adres zijn geen kadastrale percelen gevonden; probeer opnieuw of een preciezer adres' }
+      }
       kavelBron = { adres: detail, percelen }
       signaal('kavelBron', kavelBron)
       return {
-        ok: true, adres: detail.weergavenaam,
+        ok: true, adres: detail.weergavenaam, aantalPercelen: percelen.length,
         percelen: percelen.map(p => ({ id: p.id, sectie: p.sectie, perceelnummer: p.perceelnummer, oppervlakte: p.oppervlakte })),
       }
     },

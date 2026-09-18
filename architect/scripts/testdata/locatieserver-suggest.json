@@ -1,0 +1,42 @@
+{
+  "response":{
+    "numFound":1,
+    "start":0,
+    "maxScore":11.893419,
+    "numFoundExact":true,
+    "docs":[{
+      "type":"adres",
+      "weergavenaam":"Tweetandschelp 52, 2681DM Monster",
+      "adrestype":"hoofdadres",
+      "id":"adr-fe67c661c551fe9a61cee8920aa601ce",
+      "score":11.893419
+    }]
+  },
+  "highlighting":{
+    "adr-fe67c661c551fe9a61cee8920aa601ce":{
+      "suggest":["<b>Tweetandschelp</b> <b>52</b>, 2681DM <b>Monster</b>"]
+    }
+  },
+  "spellcheck":{
+    "suggestions":["tweetandschelp",{
+      "numFound":2,
+      "startOffset":0,
+      "endOffset":14,
+      "suggestion":["tweetandschel","tweetandsche"]
+    },"monster",{
+      "numFound":3,
+      "startOffset":18,
+      "endOffset":25,
+      "suggestion":["monsters","munster","monste"]
+    }],
+    "collations":["collation",{
+      "collationQuery":"tweetandschel 52 monster",
+      "hits":1,
+      "misspellingsAndCorrections":["tweetandschelp","tweetandschel","52","52","monster","monster"]
+    },"collation",{
+      "collationQuery":"tweetandsche 52 monster",
+      "hits":1,
+      "misspellingsAndCorrections":["tweetandschelp","tweetandsche","52","52","monster","monster"]
+    }]
+  }
+}
